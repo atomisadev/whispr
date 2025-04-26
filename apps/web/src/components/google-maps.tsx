@@ -34,14 +34,12 @@ interface LatLngLiteral {
   lng: number;
 }
 
-const DEFAULT_CENTER: LatLngLiteral = { lat: 40.5, lng: -74.5 }; // Default: somewhere in NJ
+const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 }; // Default: somewhere in NJ
 const DEFAULT_ZOOM = 10;
 // Backend expects radius in the same "units" as the coordinate difference calculation.
 // Since the backend calculation is flawed (treats degrees as Cartesian),
 // this radius value might need significant tuning based on observed behavior.
 // A more robust backend would use proper geospatial queries (e.g., meters/km).
-const BACKEND_RADIUS_UNITS = 5 * 100; // Arbitrary scaling factor for the flawed backend calculation. TUNE THIS!
-
 // --- !!! IMPORTANT BACKEND NOTE !!! ---
 // The current backend calculation in GetWhispers treats latitude/longitude degrees
 // as if they were points on a flat Cartesian plane (Euclidean distance).
@@ -54,6 +52,7 @@ const BACKEND_RADIUS_UNITS = 5 * 100; // Arbitrary scaling factor for the flawed
 // -------------------------------------
 
 // Helper function to parse location string
+
 const parseLocation = (locationString: string): LatLngLiteral | null => {
   try {
     const [latStr, lngStr] = locationString.split(",");
@@ -66,10 +65,10 @@ const parseLocation = (locationString: string): LatLngLiteral | null => {
     console.error(`Error parsing location string: ${locationString}`, e);
   }
   return null;
-};
+}; 
 
 export function GoogleMapComponent() {
-  const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
+  // const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
   const [mapCenter, setMapCenter] = useState<LatLngLiteral>(DEFAULT_CENTER);
   const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
   const [whispers, setWhispers] = useState<Whisper[]>([]);
@@ -90,7 +89,7 @@ export function GoogleMapComponent() {
     const backendUrl = `http://localhost:8080/whispers`; // Or use absolute path
     // ---------------------------------------
 
-    const apiUrl = `${backendUrl}?location="${lat},${lng}"&radius="${BACKEND_RADIUS_UNITS}"`;
+    const apiUrl = backendUrl;
     console.log(`Workspaceing whispers from: ${apiUrl}`);
 
     try {
@@ -136,8 +135,7 @@ export function GoogleMapComponent() {
             console.log(
               `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
             );
-            setUserLocation(currentLocation);
-            setMapCenter(currentLocation); // Center map on user
+            // setUserLocation(currentLocation);
             setMapZoom(14); // Zoom in closer
           },
           (err) => {
@@ -153,11 +151,12 @@ export function GoogleMapComponent() {
     }, []); // Run only once on mount
 
   // Effect 2: Fetch whispers when user location is known
+  /*
   useEffect(() => {
     if (userLocation) {
       fetchWhispers(userLocation.lat, userLocation.lng);
     }
-  }, [userLocation, fetchWhispers]); // Re-fetch when location changes
+  }, [userLocation, fetchWhispers]); // Re-fetch when location changes */
 
   // Find the currently selected whisper for the InfoWindow
   const selectedWhisper = whispers.find(
@@ -179,19 +178,19 @@ export function GoogleMapComponent() {
     <div className="relative h-full w-full">
       <Map
         mapId={"YOUR_MAP_ID"} // Optional: Create Map ID in Google Cloud Console for custom styles
-        center={mapCenter}
-        zoom={mapZoom}
+        defaultCenter={mapCenter}
+        defaultZoom={mapZoom}
         gestureHandling={"greedy"} // Allows map interaction without holding ctrl/cmd
         disableDefaultUI={false} // Show default controls like zoom, fullscreen
         className="absolute top-0 bottom-0 w-full h-full"
       >
-        {/* Render user's location marker if available */}
+        {/*
         {userLocation && (
           <AdvancedMarker position={userLocation} title={"Your Location"}>
-            {/* You can customize the user marker, e.g., different color Pin */}
             <span style={{ fontSize: "2rem" }}>📍</span>
           </AdvancedMarker>
         )}
+        */}
 
         {/* Render whisper markers */}
         {whispers.map((whisper) => {
@@ -206,6 +205,7 @@ export function GoogleMapComponent() {
               title={`Whisper: ${whisper.Data.substring(0, 30)}...`} // Tooltip on hover
             >
               {/* Default Pin, can be customized */}
+              <span style={{ fontSize: "2rem" }}>📍</span>
               <Pin />
             </AdvancedMarker>
           );

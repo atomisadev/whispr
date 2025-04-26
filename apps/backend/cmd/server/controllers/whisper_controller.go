@@ -2,16 +2,11 @@ package controllers
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/atomisadev/whispr/apps/backend/cmd/server/configs"
 	"github.com/atomisadev/whispr/apps/backend/cmd/server/models"
 	"github.com/atomisadev/whispr/apps/backend/cmd/server/responses"
-
-	"math"
-
-	"strconv"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -72,9 +67,9 @@ func GetWhisper(c echo.Context) error {
 }
 
 func GetWhispers(c echo.Context) error {
-	radius, _ := strconv.Atoi(c.QueryParam("radius"))
-	location := c.QueryParam("location")
-	realLocation := strings.Split(location, ",")
+	// radius, _ := strconv.Atoi(c.QueryParam("radius"))
+	// location := c.QueryParam("location")
+	// realLocation := strings.Split(location, ",")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	var whisper []models.Whisper
 	defer cancel()
@@ -91,19 +86,20 @@ func GetWhispers(c echo.Context) error {
 		if err = results.Decode(&singleWhisper); err != nil {
 			return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": err.Error()}})
 		}
+		/*
+			userLat, _ := strconv.Atoi(realLocation[0])
+			userLong, _ := strconv.Atoi(realLocation[1])
 
-		userLat, _ := strconv.Atoi(realLocation[0])
-		userLong, _ := strconv.Atoi(realLocation[1])
+			whisperLoc := strings.Split(singleWhisper.Location, ",")
+			whisperLat, _ := strconv.Atoi(whisperLoc[0])
+			whisperLong, _ := strconv.Atoi(whisperLoc[1])
 
-		whisperLoc := strings.Split(singleWhisper.Location, ",")
-		whisperLat, _ := strconv.Atoi(whisperLoc[0])
-		whisperLong, _ := strconv.Atoi(whisperLoc[1])
+			distanceFromUser := math.Sqrt(math.Pow(float64(whisperLat-userLat), 2) + math.Pow(float64(whisperLong-userLong), 2))
+		*/
 
-		distanceFromUser := math.Sqrt(math.Pow(float64(whisperLat-userLat), 2) + math.Pow(float64(whisperLong-userLong), 2))
-
-		if distanceFromUser <= float64(radius) {
-			whisper = append(whisper, singleWhisper)
-		}
+		// if distanceFromUser <= float64(radius) {
+		whisper = append(whisper, singleWhisper)
+		//}
 	}
 
 	return c.JSON(http.StatusOK, responses.WhisperResponse{Status: http.StatusOK, Message: "success", Data: &echo.Map{"data": whisper}})

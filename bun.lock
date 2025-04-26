@@ -4,6 +4,7 @@
     "": {
       "name": "whispr",
       "dependencies": {
+        "@clerk/themes": "^2.2.36",
         "@types/mapbox-gl": "^3.4.1",
         "fs": "^0.0.1-security",
         "gl-matrix": "^3.4.3",
@@ -101,6 +102,8 @@
     "@clerk/nextjs": ["@clerk/nextjs@6.18.0", "", { "dependencies": { "@clerk/backend": "^1.30.0", "@clerk/clerk-react": "^5.30.0", "@clerk/shared": "^3.7.4", "@clerk/types": "^4.55.1", "server-only": "0.0.1", "tslib": "2.8.1" }, "peerDependencies": { "next": "^13.5.7 || ^14.2.25 || ^15.2.3", "react": "^18.0.0 || ^19.0.0 || ^19.0.0-0", "react-dom": "^18.0.0 || ^19.0.0 || ^19.0.0-0" } }, "sha512-7cWFserYByK65eSX7eCyGXHlDb3ejNTyf3O8nHc4DgDLHjZn5dJA+6J0Hz1XSgUATOCSbnmkKSy1iekNMvSnYA=="],
 
     "@clerk/shared": ["@clerk/shared@3.7.4", "", { "dependencies": { "@clerk/types": "^4.55.1", "dequal": "2.0.3", "glob-to-regexp": "0.4.1", "js-cookie": "3.0.5", "std-env": "^3.9.0", "swr": "^2.3.3" }, "peerDependencies": { "react": "^18.0.0 || ^19.0.0 || ^19.0.0-0", "react-dom": "^18.0.0 || ^19.0.0 || ^19.0.0-0" }, "optionalPeers": ["react", "react-dom"] }, "sha512-Ua6MyDyXjkfrV4h7ftC5LUsz7YL+0athsiNuMUyYjE3x8r/vmJzhLjZJ7C2C3KhDq2XnMWud0iQ7SGRTop+9WQ=="],
+
+    "@clerk/themes": ["@clerk/themes@2.2.36", "", { "dependencies": { "@clerk/types": "^4.55.1", "tslib": "2.8.1" } }, "sha512-XAuSavhI77pOiI6XGEGcsmMGG3VrxFrd/kaDfQYiUtHgEoAZvyDVPrmjPgiI2oYMcphIHXYJ7hPJZYp1ixWUZg=="],
 
     "@clerk/types": ["@clerk/types@4.55.1", "", { "dependencies": { "csstype": "3.1.3" } }, "sha512-BS/shDMWfQ7M8Jlms/RJFH20N8cK1EfAWKTpiIiICFi5e/5H0gpaaWx277x341GQz4gZzVDPGdF+EhoknYOrWQ=="],
 

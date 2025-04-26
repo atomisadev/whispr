@@ -1,7 +1,7 @@
 package models
 
 type Whisper struct {
-	Location      string   `json:"location" validate:"required"`
+	Location      string   `json:"location" validate:""`
 	Data          string   `json:"data,omitempty"`
 	MediaUrl      string   `json:"mediaUrl,omitempty"`
 	DataType      string   `json:"dataType" validate:"required,oneof=text image video"`

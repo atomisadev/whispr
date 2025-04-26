@@ -33,6 +33,7 @@ var allowedImageTypes = map[string]bool{
 	"image/png":  true,
 	"image/gif":  true,
 	"image/webp": true,
+	"image/heic": true,
 }
 var allowedVideoTypes = map[string]bool{
 	"video/mp4":       true,
@@ -50,7 +51,7 @@ func CreateWhisper(c echo.Context) error {
 	emotionsStr := c.FormValue("emotions")
 
 	maxListens, err := strconv.Atoi(maxListensStr)
-	if err != nil {
+	if err != nil || maxListens < 1 {
 		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Invalid maxListens value"}})
 	}
 
@@ -145,8 +146,20 @@ func CreateWhisper(c echo.Context) error {
 	}
 
 	if validationErr := validate.Struct(&whisper); validationErr != nil {
-		log.Printf("Validation failed for whisper: %+v, Errors: %v", whisper, validationErr)
-		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": validationErr.Error()}})
+		log.Printf("Final validation failed for whisper: %+v, Errors: %v", whisper, validationErr)
+		errMap := map[string]string{}
+		if vErrs, ok := validationErr.(validator.ValidationErrors); ok {
+			for _, err := range vErrs {
+				errMap[err.Field()] = fmt.Sprintf("Field validation for '%s' failed on the '%s' tag", err.Field(), err.Tag())
+			}
+		} else {
+			errMap["error"] = validationErr.Error()
+		}
+		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{
+			Status:  http.StatusBadRequest,
+			Message: "error",
+			Data:    &echo.Map{"data": errMap},
+		})
 	}
 
 	result, err := whisperCollection.InsertOne(ctx, whisper)

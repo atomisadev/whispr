@@ -1,0 +1,12 @@
+{
+    "name": "go-api",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+      "dev": "go run ./cmd/server/main.go",
+      "build": "go build -v -o dist/server ./cmd/server",
+      "start": "PORT=3001 ./dist/server", 
+      "lint": "echo 'No linting configured for go-api yet'",
+      "clean": "rm -rf dist"
+    }
+  }

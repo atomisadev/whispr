@@ -1,20 +1,26 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
-import Image from 'next/image'
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Map,
   AdvancedMarker,
 } from "@vis.gl/react-google-maps";
-import * as Minio from "minio";
 
-const minioClient = new Minio.Client({
-  endPoint: 'http://20.115.91.105',
-  port: 9000,
-  useSSL: false,
-  accessKey: 'zBElw10A652cYKioXDqD',
-  secretKey: 'lB7FVIXiQ0zG4hWg0AWC5ZndnCYQEWGvkpR59orz',
-})
+You are absolutely correct! In TypeScript, the options prop for the <Map> component from @vis.gl/react-google-maps expects a specific type definition. If you're directly assigning a plain JavaScript object to it, TypeScript will likely complain about a type mismatch.
+
+To make the options prop work correctly in your TypeScript code, you need to ensure that the object you're passing conforms to the google.maps.MapOptions interface provided by the Google Maps JavaScript API's type definitions.
+
+Here's how you can correctly apply the options prop with your dark mode style in TypeScript:
+TypeScript
+
+"use client";
+
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  Map,
+  AdvancedMarker,
+} from "@vis.gl/react-google-maps";
+import type { GoogleMapsContextProps } from "@vis.gl/react-google-maps"; // Import the context props type
 
 interface Whisper {
   Location: string;
@@ -41,7 +47,114 @@ interface LatLngLiteral {
 }
 
 const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 };
-const DEFAULT_ZOOM = 10;
+const DEFAULT_ZOOM = 8;
+
+const darkModeStyle: google.maps.MapStyle[] = [ // Explicitly type the style array
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  {
+    featureType: "administrative.locality",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#263c3f" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6b9a76" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#38414e" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#212a37" }],
+  },
+  {
+    featureType: "road",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9ca5b3" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#746855" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#1f2835" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#f3d19c" }],
+  },
+  {
+    featureType: "transit",
+    elementType: "geometry",
+    stylers: [{ color: "#2f3948" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#17263c" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#515c6d" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#17263c" }],
+  },
+];
+interface Whisper {
+  Location: string;
+  DataType: string;
+  Data: string;
+  MaxListens: number;
+  AmountListens: number;
+  Emotions: string[];
+  _id: string;
+  MediaUrl?: string;
+}
+
+interface WhisperApiResponse {
+  status: number;
+  message: string;
+  data?: {
+    data: Whisper[];
+  };
+}
+
+interface LatLngLiteral {
+  lat: number;
+  lng: number;
+}
+
+const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 };
+const DEFAULT_ZOOM = 8; // Changed default zoom to a more reasonable value
 
 const parseLocation = (locationString: string): LatLngLiteral | null => {
   try {
@@ -78,7 +191,7 @@ const parseLocation = (locationString: string): LatLngLiteral | null => {
   return null;
 };
 
-export async function GoogleMapComponent() {
+export function GoogleMapComponent() {
   const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
   const [mapCenter, setMapCenter] = useState<LatLngLiteral>(DEFAULT_CENTER);
   const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
@@ -87,7 +200,6 @@ export async function GoogleMapComponent() {
   const [error, setError] = useState<string | null>(null);
   const [selectedWhisper, setSelectedWhisper] = useState<Whisper | null>(null);
 
-  // Function to fetch  (mostly unchanged, uses userLocation state)
   const fetchWhispers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -137,9 +249,8 @@ export async function GoogleMapComponent() {
     } finally {
       setIsLoading(false);
     }
-  }, []); // No dependencies needed here as it reads state directly when called
+  }, []);
 
-  // Effect 1: Get User's Initial Location
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -151,12 +262,11 @@ export async function GoogleMapComponent() {
           );
           setUserLocation(currentLocation);
           setMapCenter(currentLocation);
-          setMapZoom(14); // Zoom in closer
+          setMapZoom(8); // Zoom in closer when user location is found
         },
         (err) => {
           console.warn(`Geolocation Error (${err.code}): ${err.message}`);
           setError("Unable to retrieve location. Showing default area.");
-          // Keep default center if geolocation fails
           setMapCenter(DEFAULT_CENTER);
           setMapZoom(DEFAULT_ZOOM);
         },
@@ -167,11 +277,11 @@ export async function GoogleMapComponent() {
       setMapCenter(DEFAULT_CENTER);
       setMapZoom(DEFAULT_ZOOM);
     }
-  }, []); 
+  }, []);
 
   useEffect(() => {
     fetchWhispers();
-  }, [fetchWhispers]); 
+  }, [fetchWhispers]);
 
   if (error && !isLoading) {
     return (
@@ -181,17 +291,23 @@ export async function GoogleMapComponent() {
     );
   }
 
+  const mapOptions: google.maps.MapOptions = {
+    styles: darkModeStyle, // Directly apply the dark mode style
+  };
+
   return (
     <div className="grid grid-cols-3 grid-row-1 h-full gap-4">
       {/* Google Map Section */}
       <div className="col-span-2">
         <Map
           mapId={"MAP_ID"}
-          defaultCenter={mapCenter}
+          center={mapCenter} // Use the state for center
           streetViewControl={false}
+          defaultZoom={15}
           gestureHandling={"greedy"}
           disableDefaultUI={false}
           className={"h-full"}
+          options={mapOptions}
         >
           {userLocation && (
             <AdvancedMarker position={userLocation} title={"Your Location"}>
@@ -207,9 +323,8 @@ export async function GoogleMapComponent() {
               ></div>
             </AdvancedMarker>
           )}
-
-          {/* Render whisper markers */}
-          {whispers.map((whisper) => {
+          {
+          whispers.map((whisper) => {
             const position = parseLocation(whisper.Location);
             if (!position) return null;
 
@@ -218,7 +333,6 @@ export async function GoogleMapComponent() {
                 key={whisper._id}
                 position={position}
                 onClick={() => {
-                  
                   setSelectedWhisper(whisper);
                 }}
                 title={`Whisper: ${whisper.Data.substring(0, 30)}...`}
@@ -227,7 +341,7 @@ export async function GoogleMapComponent() {
                   style={{
                     width: "20px",
                     height: "20px",
-                    backgroundColor: "red",
+                    backgroundColor: "#0F2026",
                     border: "2px solid black",
                     borderRadius: "50%",
                     cursor: "pointer",
@@ -238,13 +352,13 @@ export async function GoogleMapComponent() {
           })}
         </Map>
         {isLoading && (
-          <div className="absolute top-2 left-2 bg-white bg-opacity-80 p-2 rounded shadow z-10">
+          <div className="absolute top-2 left-2 bg-opacity-80 p-2 rounded shadow z-10">
             Loading whispers...
           </div>
         )}
       </div>
 
-      <div className="col-span-1 bg-gray-100 p-4 border-l border-gray-300 overflow-y-auto">
+      <div className="col-span-1 p-4 border-l border-gray-300 overflow-y-auto">
         <h2 className="text-xl font-semibold mb-4">Whisper Details</h2>
         {selectedWhisper ? (
           <div>
@@ -257,7 +371,7 @@ export async function GoogleMapComponent() {
             {selectedWhisper.DataType === "image" &&
               selectedWhisper.MediaUrl && (
                 <img
-                  src={await minioClient.presignedGetObject("whispers", selectedWhisper.MediaUrl)}
+                  src={selectedWhisper.MediaUrl}
                   alt="Whisper content"
                   className="w-full h-auto rounded mb-3"
                 />

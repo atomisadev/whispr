@@ -15,7 +15,7 @@ func main() {
 	e := echo.New()
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*"}, // Add your frontend origin(s) here
+		AllowOrigins: []string{"*"},
 
 		AllowMethods: []string{
 			http.MethodGet,
@@ -24,21 +24,22 @@ func main() {
 			http.MethodPatch,
 			http.MethodPost,
 			http.MethodDelete,
-			http.MethodOptions, 
+			http.MethodOptions,
 		},
 
 		AllowHeaders: []string{
 			echo.HeaderOrigin,
 			echo.HeaderContentType,
 			echo.HeaderAccept,
-			echo.HeaderAuthorization, 
+			echo.HeaderAuthorization,
 		},
-
 	}))
 
 	configs.ConnectDB()
+	configs.ConnectMinio()
 
 	routes.UserRoute(e)
+	// routes.UploadRoute(e)
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())

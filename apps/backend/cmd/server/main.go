@@ -1,8 +1,10 @@
 package main
 
 import (
-	"net/http"
 	"os"
+
+	"github.com/atomisadev/whispr/apps/backend/cmd/server/configs"
+	"github.com/atomisadev/whispr/apps/backend/cmd/server/routes"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -11,18 +13,18 @@ import (
 func main() {
 	e := echo.New()
 
+	configs.ConnectDB()
+
+	routes.UserRoute(e)
+
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	e.GET("/", hello)
+	e.GET("/location/:id", getWhispr)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 	e.Logger.Fatal(e.Start(":" + port))
-}
-
-func hello(c echo.Context) error {
-	return c.String(http.StatusOK, "Hello from the Go API!")
 }

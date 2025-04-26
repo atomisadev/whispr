@@ -43,7 +43,7 @@ interface LatLngLiteral {
 }
 
 const DEFAULT_CENTER: LatLngLiteral = { lat: 40.6945, lng: -74.547 };
-const DEFAULT_ZOOM = 16;
+const DEFAULT_ZOOM = 17;
 const INITIAL_LOAD_COUNT = 4; // Load the first 4 videos initially
 
 // Removed LocalStorage Key
@@ -288,8 +288,8 @@ export function GoogleMapComponent() {
       <div className="col-span-2 relative">
         <Map
           mapId={process.env.NEXT_PUBLIC_MAP_ID || "DEMO_MAP_ID"}
-          center={mapCenter}
-          zoom={mapZoom}
+          defaultCenter={mapCenter}
+          defaultZoom={mapZoom}
           streetViewControl={false}
           gestureHandling={"greedy"}
           disableDefaultUI={false}
@@ -350,7 +350,7 @@ export function GoogleMapComponent() {
       </div>
 
       {/* Sidebar Section */}
-      <div className="col-span-1 p-4 border-l border-gray-300 overflow-y-auto bg-gray-50 text-gray-900">
+      <div className="col-span-1 p-4 overflow-y-auto bg-[#0F2026] text-[#f2f2f2]">
         <h2 className="text-xl font-semibold mb-4">Whisper Details</h2>
         {selectedWhisper ? (
           <div>
@@ -424,7 +424,7 @@ export function GoogleMapComponent() {
             ref={fileInputRef}
             onChange={handleFileUpload}
             accept="video/quicktime,.mov" // Accept only .mov files
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#4E4BFF] file:text-[#f2f2f2] hover:file:bg-[#4E4BFFaa] disabled:opacity-50"
             disabled={allCodeData.length === 0} // Disable if initial data failed to load
           />
           {allCodeData.length === 0 && !isLoading && (

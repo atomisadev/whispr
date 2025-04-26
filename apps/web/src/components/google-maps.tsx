@@ -1,11 +1,11 @@
 // apps/web/src/components/google-map.tsx
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   Map,
   AdvancedMarker,
-  Pin,
+  // Pin,
   InfoWindow,
 } from "@vis.gl/react-google-maps";
 
@@ -18,6 +18,7 @@ interface Whisper {
   AmountListens: number;
   Emotions: string[];
   _id: string;
+  MediaUrl?: string;
 }
 
 // Define the structure for the backend API response (same as before)
@@ -34,39 +35,43 @@ interface LatLngLiteral {
   lng: number;
 }
 
-const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 }; // Default: somewhere in NJ
+const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 };
 const DEFAULT_ZOOM = 10;
-// Backend expects radius in the same "units" as the coordinate difference calculation.
-// Since the backend calculation is flawed (treats degrees as Cartesian),
-// this radius value might need significant tuning based on observed behavior.
-// A more robust backend would use proper geospatial queries (e.g., meters/km).
-// --- !!! IMPORTANT BACKEND NOTE !!! ---
-// The current backend calculation in GetWhispers treats latitude/longitude degrees
-// as if they were points on a flat Cartesian plane (Euclidean distance).
-// This is inaccurate for calculating real-world distances on a sphere.
-// For accurate results, the backend should use:
-// 1. MongoDB's geospatial queries ($nearSphere with a 2dsphere index).
-// 2. Haversine formula or similar geodetic calculations if not using DB queries.
-// The `BACKEND_RADIUS_UNITS` constant above is a crude attempt to map KM to
-// the backend's flawed unit system and WILL require tuning.
-// -------------------------------------
-
-// Helper function to parse location string
 
 const parseLocation = (locationString: string): LatLngLiteral | null => {
   try {
-    console.log(locationString);
-    const [latStr, lngStr] = locationString.split(",");
+    const parts = locationString.split(",");
+    if (parts.length !== 2) {
+      console.error(
+        `Invalid location string format (expected one comma): "${locationString}"`
+      );
+      return null;
+    }
+    const latStr = parts[0].trim();
+    const lngStr = parts[1].trim();
     const lat = parseFloat(latStr);
     const lng = parseFloat(lngStr);
-    if (!isNaN(lat) && !isNaN(lng)) {
+
+    if (
+      !isNaN(lat) &&
+      !isNaN(lng) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180
+    ) {
       return { lat, lng };
+    } else {
+      console.error(
+        `Invalid number format or range: lat='${latStr}', lng='${lngStr}' from string "${locationString}"`
+      );
+      return null;
     }
   } catch (e) {
-    console.error(`Error parsing location string: ${locationString}`, e);
+    console.error(`Error parsing location string: "${locationString}"`, e);
   }
   return null;
-}; 
+};
 
 export function GoogleMapComponent() {
   const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
@@ -79,11 +84,15 @@ export function GoogleMapComponent() {
     string | null
   >(null);
 
+  const markerRefs = useRef<
+    Record<string, google.maps.marker.AdvancedMarkerElement | null>
+  >({});
+
   // Function to fetch whispers (mostly unchanged, uses userLocation state)
-  const fetchWhispers = useCallback(async (lat: number, lng: number) => {
+  const fetchWhispers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    setWhispers([]); // Clear previous whispers
+    // setWhispers([]); // Clear previous whispers
 
     // --- Adjust Backend URL if necessary ---
     // const backendUrl = `/api/whispers`; // Use relative path assumes proxy/same-origin
@@ -102,8 +111,18 @@ export function GoogleMapComponent() {
       console.log("API Response:", result);
 
       if (result.status >= 200 && result.status < 300 && result.data?.data) {
-        setWhispers(result.data.data);
+        const validWhispers = result.data.data.filter((w) => {
+          const pos = parseLocation(w.Location);
+          if (!pos) {
+            console.warn(
+              `Skipping whisper with invalid location: ${w._id}, Location: "${w.Location}"`
+            );
+          }
+          return !!pos;
+        });
+        setWhispers(validWhispers);
       } else {
+        setWhispers([]);
         if (result.status >= 200 && result.status < 300) {
           console.log(
             "API returned success but no whispers found in the response data."
@@ -127,47 +146,66 @@ export function GoogleMapComponent() {
   }, []); // No dependencies needed here as it reads state directly when called
 
   // Effect 1: Get User's Initial Location
-    useEffect(() => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            const currentLocation = { lat: latitude, lng: longitude };
-            console.log(
-              `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
-            );
-            setUserLocation(currentLocation);
-            setMapZoom(14); // Zoom in closer
-          },
-          (err) => {
-            console.warn(`Geolocation Error (${err.code}): ${err.message}`);
-            setError("Unable to retrieve location. Showing default area.");
-            // Keep default center if geolocation fails
-          },
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-      } else {
-        setError("Geolocation is not supported by this browser.");
-      }
-    }, []); // Run only once on mount
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const currentLocation = { lat: latitude, lng: longitude };
+          console.log(
+            `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
+          );
+          setUserLocation(currentLocation);
+          setMapCenter(currentLocation);
+          setMapZoom(14); // Zoom in closer
+        },
+        (err) => {
+          console.warn(`Geolocation Error (${err.code}): ${err.message}`);
+          setError("Unable to retrieve location. Showing default area.");
+          // Keep default center if geolocation fails
+          setMapCenter(DEFAULT_CENTER);
+          setMapZoom(DEFAULT_ZOOM);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    } else {
+      setError("Geolocation is not supported by this browser.");
+      setMapCenter(DEFAULT_CENTER);
+      setMapZoom(DEFAULT_ZOOM);
+    }
+  }, []); // Run only once on mount
 
   // Effect 2: Fetch whispers when user location is known
-  
-  useEffect(() => {
-    if (userLocation) {
-      fetchWhispers(userLocation.lat, userLocation.lng);
-    }
-  }, [userLocation, fetchWhispers]); // Re-fetch when location changes 
 
-  // Find the currently selected whisper for the InfoWindow
-  const selectedWhisper = whispers.find(
-    (w) => w._id === openInfoWindowMarkerId
-  );
+  useEffect(() => {
+    fetchWhispers();
+  }, [fetchWhispers]); // Re-fetch when location changes
+
+  let foundWhisper: Whisper | undefined = undefined;
+
+  if (
+    typeof openInfoWindowMarkerId === "string" &&
+    openInfoWindowMarkerId.length > 0
+  ) {
+    console.log(
+      `Attempting to find whisper with ID: "${openInfoWindowMarkerId}"`
+    ); // Debug Log
+    foundWhisper = whispers.find((w) => w._id === openInfoWindowMarkerId);
+  }
+  const selectedWhisper = foundWhisper;
+
   const selectedWhisperLocation = selectedWhisper
     ? parseLocation(selectedWhisper.Location)
     : null;
 
-  if (error) {
+  console.log("Current openInfoWindowMarkerId:", openInfoWindowMarkerId);
+  console.log("Selected Whisper Object:", selectedWhisper);
+  console.log(
+    "Selected Whisper Location for InfoWindow:",
+    selectedWhisperLocation
+  );
+
+  if (error && !isLoading) {
     return (
       <div className="flex items-center justify-center h-full text-red-500 p-4">
         Error: {error}
@@ -178,36 +216,58 @@ export function GoogleMapComponent() {
   return (
     <div className="relative h-full w-full">
       <Map
-        mapId={"YOUR_MAP_ID"} // Optional: Create Map ID in Google Cloud Console for custom styles
+        mapId={"MAP_ID"} // Optional: Create Map ID in Google Cloud Console for custom styles
         defaultCenter={mapCenter}
-        defaultZoom={mapZoom}
+        // center={mapCenter}
+        // zoom={mapZoom}
+        onCenterChanged={(ev) => setMapCenter(ev.detail.center)}
         gestureHandling={"greedy"} // Allows map interaction without holding ctrl/cmd
         disableDefaultUI={false} // Show default controls like zoom, fullscreen
         className="absolute top-0 bottom-0 w-full h-full"
       >
-        
         {userLocation && (
           <AdvancedMarker position={userLocation} title={"Your Location"}>
-            <span style={{ fontSize: "2rem" }}>📍</span>
+            <div
+              style={{
+                width: "15px",
+                height: "15px",
+                backgroundColor: "blue",
+                border: "2px solid white",
+                borderRadius: "50%",
+                boxShadow: "0 0 5px rgba(0, 0, 255, 0.5)",
+              }}
+            ></div>
           </AdvancedMarker>
         )}
-        
 
         {/* Render whisper markers */}
         {whispers.map((whisper) => {
           const position = parseLocation(whisper.Location);
-          if (!position) return null; // Skip if location is invalid
+          if (!position) return null;
 
           return (
             <AdvancedMarker
               key={whisper._id}
               position={position}
-              onClick={() => setOpenInfoWindowMarkerId(whisper._id)}
+              onClick={() => {
+                console.log(
+                  `Whisper clicked: ID=${whisper._id} Data Type=${whisper.DataType}, Description=${whisper.Data || "N/A"}`
+                );
+                setOpenInfoWindowMarkerId(whisper._id);
+              }}
               title={`Whisper: ${whisper.Data.substring(0, 30)}...`} // Tooltip on hover
             >
               {/* Default Pin, can be customized */}
-              <span style={{ fontSize: "2rem" }}>📍</span>
-              <Pin />
+              <div
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  backgroundColor: "red",
+                  border: "2px solid black",
+                  borderRadius: "50%",
+                  cursor: "pointer", // Indicate it's clickable
+                }}
+              />
             </AdvancedMarker>
           );
         })}
@@ -216,13 +276,78 @@ export function GoogleMapComponent() {
         {selectedWhisper && selectedWhisperLocation && (
           <InfoWindow
             position={selectedWhisperLocation}
-            pixelOffset={[0, -40]} // Adjust offset to position above marker pin
+            pixelOffset={[0, -15]} // Adjust offset to position above marker pin
             onCloseClick={() => setOpenInfoWindowMarkerId(null)}
           >
-            <div style={{ maxWidth: "200px" }}>
-              <h3>Whisper</h3>
-              <p>{selectedWhisper.Data}</p>
-              <small>Emotions: {selectedWhisper.Emotions.join(", ")}</small>
+            <div
+              style={{
+                maxWidth: "250px",
+                padding: "5px",
+                fontFamily: "sans-serif",
+                fontSize: "14px",
+              }}
+            >
+              <div
+                style={{
+                  maxWidth: "250px",
+                  padding: "5px",
+                  fontFamily: "sans-serif",
+                  fontSize: "14px",
+                }}
+              >
+                <h3 style={{ margin: "0 0 5px 0", fontSize: "1.1em" }}>
+                  Whisper ({selectedWhisper.DataType}) {/* Correct Data Type */}
+                </h3>
+                {selectedWhisper.DataType === "text" && (
+                  <p style={{ margin: "5px 0" }}>{selectedWhisper.Data}</p>
+                )}{" "}
+                {/* Correct Data */}
+                {selectedWhisper.DataType === "image" &&
+                  selectedWhisper.MediaUrl && (
+                    <img
+                      src={selectedWhisper.MediaUrl}
+                      alt="Whisper content"
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: "150px",
+                        height: "auto",
+                        display: "block",
+                        margin: "5px 0",
+                      }}
+                    />
+                  )}
+                {selectedWhisper.DataType === "video" &&
+                  selectedWhisper.MediaUrl && (
+                    <video
+                      controls
+                      src={selectedWhisper.MediaUrl}
+                      style={{
+                        maxWidth: "100%",
+                        height: "auto",
+                        display: "block",
+                        margin: "5px 0",
+                      }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
+                {selectedWhisper.Data &&
+                  (selectedWhisper.DataType === "image" ||
+                    selectedWhisper.DataType === "video") && (
+                    <p style={{ margin: "5px 0" }}>
+                      <em>{selectedWhisper.Data}</em>
+                    </p>
+                  )}
+                <small
+                  style={{ display: "block", marginTop: "8px", color: "#555" }}
+                >
+                  Emotions: {selectedWhisper.Emotions.join(", ") || "None"}
+                </small>
+                <small style={{ display: "block", color: "#555" }}>
+                  Listens: {selectedWhisper.AmountListens}/
+                  {selectedWhisper.MaxListens}
+                </small>
+              </div>
             </div>
           </InfoWindow>
         )}

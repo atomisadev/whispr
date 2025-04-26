@@ -8,8 +8,10 @@ Exported File Structure:
 │   │   │   └── server
 │   │   │       ├── configs
 │   │   │       │   ├── env.go
+│   │   │       │   ├── minio.go
 │   │   │       │   └── setup.go
 │   │   │       ├── controllers
+│   │   │       │   ├── upload_controller.go
 │   │   │       │   └── whisper_controller.go
 │   │   │       ├── main.go
 │   │   │       ├── models
@@ -17,6 +19,7 @@ Exported File Structure:
 │   │   │       ├── responses
 │   │   │       │   └── whisper_response.go
 │   │   │       └── routes
+│   │   │           ├── upload_routes.go
 │   │   │           └── whisper_routes.go
 │   │   ├── go.mod
 │   │   └── package.json
@@ -173,22 +176,149 @@ Learn more about the power of Turborepo:
 package configs
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
 
-func EnvMongoURI() string {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+var envLoaded = false
+
+func loadEnvOnce() {
+	if !envLoaded {
+		err := godotenv.Load()
+		if err != nil {
+			log.Println("Warning: Error loading .env file", err)
+		}
+		envLoaded = true
 	}
 
+}
+func EnvMongoURI() string {
+	loadEnvOnce()
 	return os.Getenv("MONGOURI")
 }
 
+//rest is minio shit
+func EnvMinioEndpoint() string {
+	loadEnvOnce()
+	val := os.Getenv("MINIO_ENDPOINT")
+	if val == "" {
+		log.Println("Warning: MINIO_ENDPOINT not set, defaulting to localhost:9000")
+		return "localhost:9000"
+	}
+	return val
+}
+
+func EnvMinioAccessKey() string {
+	loadEnvOnce()
+	return os.Getenv("MINIO_ACCESS_KEY")
+}
+
+func EnvMinioSecretKey() string {
+	loadEnvOnce()
+	return os.Getenv("MINIO_SECRET_KEY")
+}
+
+func EnvMinioBucket() string {
+	loadEnvOnce()
+	bucket := os.Getenv("MINIO_BUCKET")
+	if bucket == "" {
+		log.Println("Warning: MINIO_BUCKET not set, defaulting to 'whispers'")
+		return "whispers"
+	}
+	return bucket
+}
+
+func EnvMinioUseSSL() bool {
+	loadEnvOnce()
+	useSSLStr := os.Getenv("MINIO_USE_SSL")
+	useSSL, err := strconv.ParseBool(useSSLStr)
+	if err != nil {
+		return false
+	}
+	return useSSL
+}
+
+func EnvMinioPublicURLBase() string {
+	loadEnvOnce()
+	publicURL := os.Getenv("MINIO_PUBLIC_URL_BASE")
+	if publicURL != "" {
+		if !strings.HasSuffix(publicURL, "/") {
+			publicURL += "/"
+		}
+		return publicURL
+	}
+
+	endpoint := EnvMinioEndpoint()
+	useSSL := EnvMinioUseSSL()
+	protocol := "http"
+	if useSSL {
+		protocol = "https"
+	}
+	return fmt.Sprintf("%s://%s/", protocol, endpoint)
+}
+
 --- END FILE: apps/backend/cmd/server/configs/env.go ---
+
+--- START FILE: apps/backend/cmd/server/configs/minio.go ---
+package configs
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+)
+
+var MinioClient *minio.Client
+
+func ConnectMinio() {
+	endpoint := EnvMinioEndpoint()
+	accessKeyID := EnvMinioAccessKey()
+	secretAccessKey := EnvMinioSecretKey()
+	useSSL := EnvMinioUseSSL()
+
+	client, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
+		Secure: useSSL,
+	})
+	if err != nil {
+		log.Fatalln("Failed to initialize Minio client:", err)
+	}
+
+	log.Println("Successfully connected to Minio!")
+	MinioClient = client
+}
+
+func EnsureBucketExists(ctx context.Context, bucketName string, location string) error {
+	if MinioClient == nil {
+		return fmt.Errorf("Minio client not initialized")
+	}
+	exists, err := MinioClient.BucketExists(ctx, bucketName)
+	if err != nil {
+		log.Printf("Error checking if bucket %s exists: %v", bucketName, err)
+		return err
+	}
+	if !exists {
+		log.Printf("Bucket %s does not exist. Creating...", bucketName)
+		err = MinioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{Region: location})
+		if err != nil {
+			log.Printf("Error creating bucket %s: %v", bucketName, err)
+			return err
+		}
+		log.Printf("Successfully created bucket %s", bucketName)
+	} else {
+		log.Printf("Bucket %s already exists.", bucketName)
+	}
+	return nil
+}
+--- END FILE: apps/backend/cmd/server/configs/minio.go ---
 
 --- START FILE: apps/backend/cmd/server/configs/setup.go ---
 package configs
@@ -235,62 +365,276 @@ func GetCollection(client *mongo.Client, collectionName string) *mongo.Collectio
 
 --- END FILE: apps/backend/cmd/server/configs/setup.go ---
 
+--- START FILE: apps/backend/cmd/server/controllers/upload_controller.go ---
+package controllers
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"path/filepath"
+	"time"
+
+	"github.com/atomisadev/whispr/apps/backend/cmd/server/configs"
+	"github.com/atomisadev/whispr/apps/backend/cmd/server/responses"
+
+	"github.com/google/uuid"                                         
+	"github.com/labstack/echo/v4"
+	"github.com/minio/minio-go/v7"
+)
+
+func UploadVideo(c echo.Context) error {
+	fileHeader, err := c.FormFile("video") 
+	if err != nil {
+		log.Printf("Error getting form file: %v", err)
+		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{ 
+			Status:  http.StatusBadRequest,
+			Message: "error",
+			Data:    &echo.Map{"data": "Missing or invalid 'video' file field"},
+		})
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		log.Printf("Error opening file stream: %v", err)
+		return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{
+			Status:  http.StatusInternalServerError,
+			Message: "error",
+			Data:    &echo.Map{"data": "Failed to open uploaded file"},
+		})
+	}
+	defer file.Close() 
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) 
+	defer cancel()
+
+	bucketName := configs.EnvMinioBucket()
+	objectName := uuid.NewString() + filepath.Ext(fileHeader.Filename)
+	contentType := fileHeader.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	fileSize := fileHeader.Size
+
+	log.Printf("Attempting to upload: Bucket=%s, Object=%s, Size=%d, ContentType=%s", bucketName, objectName, fileSize, contentType)
+
+
+	uploadInfo, err := configs.MinioClient.PutObject(ctx, bucketName, objectName, file, fileSize, minio.PutObjectOptions{
+		ContentType: contentType,
+	})
+
+	if err != nil {
+		log.Printf("Error uploading to Minio: %v", err)
+		return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{
+			Status:  http.StatusInternalServerError,
+			Message: "error",
+			Data:    &echo.Map{"data": fmt.Sprintf("Failed to upload file to storage: %v", err)},
+		})
+	}
+
+	log.Printf("Successfully uploaded %s of size %d (ETag: %s)", objectName, uploadInfo.Size, uploadInfo.ETag)
+
+	return c.JSON(http.StatusCreated, responses.WhisperResponse{
+		Status:  http.StatusCreated,
+		Message: "success",
+		Data: &echo.Map{"data": echo.Map{
+			"message":    "Video uploaded successfully",
+			"bucket":     uploadInfo.Bucket,
+			"objectName": uploadInfo.Key, 
+			"size":       uploadInfo.Size,
+			"etag":       uploadInfo.ETag,
+		}},
+	})
+}
+--- END FILE: apps/backend/cmd/server/controllers/upload_controller.go ---
+
 --- START FILE: apps/backend/cmd/server/controllers/whisper_controller.go ---
 package controllers
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"mime"
 	"net/http"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/atomisadev/whispr/apps/backend/cmd/server/configs"
 	"github.com/atomisadev/whispr/apps/backend/cmd/server/models"
 	"github.com/atomisadev/whispr/apps/backend/cmd/server/responses"
-
-	"math"
-
-	"strconv"
-
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/minio/minio-go/v7"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"golang.org/x/net/context"
 )
 
 var whisperCollection *mongo.Collection = configs.GetCollection(configs.DB, "whispers")
-
 var validate = validator.New()
 
+var allowedImageTypes = map[string]bool{
+	"image/jpeg": true,
+	"image/png":  true,
+	"image/gif":  true,
+	"image/webp": true,
+	"image/heic": true,
+}
+var allowedVideoTypes = map[string]bool{
+	"video/mp4":       true,
+	"video/webm":      true,
+	"video/ogg":       true,
+	"video/quicktime": true,
+}
+
 func CreateWhisper(c echo.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	var whisper models.Whisper
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
-	if err := c.Bind(&whisper); err != nil {
-		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": err.Error()}})
+	location := c.FormValue("location")
+	maxListensStr := c.FormValue("maxListens")
+	emotionsStr := c.FormValue("emotions")
+
+	maxListens, err := strconv.Atoi(maxListensStr)
+	if err != nil || maxListens < 1 {
+		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Invalid maxListens value"}})
+	}
+
+	var emotions []string
+	if err := json.Unmarshal([]byte(emotionsStr), &emotions); err != nil {
+		emotions = strings.Split(emotionsStr, ",")
+		for i := range emotions {
+			emotions[i] = strings.TrimSpace(emotions[i])
+		}
+	}
+	validEmotions := []string{}
+	for _, e := range emotions {
+		if e != "" {
+			validEmotions = append(validEmotions, e)
+		}
+	}
+	emotions = validEmotions
+
+	whisper := models.Whisper{
+		Location:      location,
+		MaxListens:    maxListens,
+		AmountListens: 0,
+		Emotions:      emotions,
+	}
+
+	mediaFileHeader, err := c.FormFile("mediaFile")
+
+	if err == nil && mediaFileHeader != nil {
+		log.Printf("Received mediaFile: %s, Size: %d", mediaFileHeader.Filename, mediaFileHeader.Size)
+
+		mediaFile, err := mediaFileHeader.Open()
+		if err != nil {
+			log.Printf("Error opening media file stream: %v", err)
+			return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": "Failed to open uploaded file"}})
+		}
+		defer mediaFile.Close()
+
+		contentTypeHeader := mediaFileHeader.Header.Get("Content-Type")
+		contentType, _, _ := mime.ParseMediaType(contentTypeHeader)
+		if contentType == "" || contentType == "application/octet-stream" {
+			ext := strings.ToLower(filepath.Ext(mediaFileHeader.Filename))
+			contentType = mime.TypeByExtension(ext)
+			if contentType == "" {
+				contentType = "application/octet-stream"
+			}
+		}
+
+		log.Printf("Detected Content-Type: %s (Header was: %s)", contentType, contentTypeHeader)
+
+		if allowedImageTypes[contentType] {
+			whisper.DataType = "image"
+		} else if allowedVideoTypes[contentType] {
+			whisper.DataType = "video"
+		} else {
+			log.Printf("Unsupported file type: %s", contentType)
+			return c.JSON(http.StatusBadRequest, responses.WhisperResponse{
+				Status:  http.StatusBadRequest,
+				Message: "error",
+				Data:    &echo.Map{"data": fmt.Sprintf("Unsupported file type: %s. Please upload common image or video formats.", contentType)},
+			})
+		}
+
+		bucketName := configs.EnvMinioBucket()
+		objectName := uuid.NewString() + filepath.Ext(mediaFileHeader.Filename)
+		fileSize := mediaFileHeader.Size
+
+		log.Printf("Attempting %s upload: Bucket=%s, Object=%s, Size=%d, ContentType=%s", whisper.DataType, bucketName, objectName, fileSize, contentType)
+
+		_, err = configs.MinioClient.PutObject(ctx, bucketName, objectName, mediaFile, fileSize, minio.PutObjectOptions{
+			ContentType: contentType,
+		})
+		if err != nil {
+			log.Printf("Error uploading %s to Minio: %v", whisper.DataType, err)
+			return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": "Failed to upload file to storage"}})
+		}
+
+		publicBaseURL := configs.EnvMinioPublicURLBase()
+		whisper.MediaUrl = publicBaseURL + bucketName + "/" + objectName
+		log.Printf("%s uploaded successfully: %s", strings.Title(whisper.DataType), whisper.MediaUrl)
+
+	} else if err != nil && err != http.ErrMissingFile {
+		log.Printf("Error retrieving form file 'mediaFile': %v", err)
+		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Error processing file upload"}})
+	} else {
+		textContent := c.FormValue("data")
+		if strings.TrimSpace(textContent) == "" {
+			return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Missing 'mediaFile' or non-empty 'data' field is required"}})
+		}
+		whisper.DataType = "text"
+		whisper.Data = textContent
+		log.Println("Processing text whisper.")
 	}
 
 	if validationErr := validate.Struct(&whisper); validationErr != nil {
-		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": validationErr.Error()}})
+		log.Printf("Final validation failed for whisper: %+v, Errors: %v", whisper, validationErr)
+		errMap := map[string]string{}
+		if vErrs, ok := validationErr.(validator.ValidationErrors); ok {
+			for _, err := range vErrs {
+				errMap[err.Field()] = fmt.Sprintf("Field validation for '%s' failed on the '%s' tag", err.Field(), err.Tag())
+			}
+		} else {
+			errMap["error"] = validationErr.Error()
+		}
+		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{
+			Status:  http.StatusBadRequest,
+			Message: "error",
+			Data:    &echo.Map{"data": errMap},
+		})
 	}
 
-	newWhisper := models.Whisper{
-		Location:      whisper.Location,
-		Data:          whisper.Data,
-		DataType:      whisper.DataType,
-		MaxListens:    whisper.MaxListens,
-		AmountListens: whisper.AmountListens,
-		Emotions:      whisper.Emotions,
-	}
-
-	result, err := whisperCollection.InsertOne(ctx, newWhisper)
+	result, err := whisperCollection.InsertOne(ctx, whisper)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": err.Error()}})
+		log.Printf("Error inserting whisper into MongoDB: %v", err)
+		return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": "Failed to save whisper"}})
 	}
 
-	return c.JSON(http.StatusCreated, responses.WhisperResponse{Status: http.StatusCreated, Message: "success", Data: &echo.Map{"data": result}})
+	var createdWhisper models.Whisper
+	err = whisperCollection.FindOne(ctx, bson.M{"_id": result.InsertedID}).Decode(&createdWhisper)
+	if err != nil {
+		log.Printf("Error fetching created whisper: %v", err)
+		return c.JSON(http.StatusCreated, responses.WhisperResponse{
+			Status:  http.StatusCreated,
+			Message: "success (whisper created, but failed to fetch for response)",
+			Data:    &echo.Map{"data": result},
+		})
+	}
+
+	return c.JSON(http.StatusCreated, responses.WhisperResponse{
+		Status:  http.StatusCreated,
+		Message: "success",
+		Data:    &echo.Map{"data": createdWhisper},
+	})
 }
 
 func GetWhisper(c echo.Context) error {
@@ -299,52 +643,96 @@ func GetWhisper(c echo.Context) error {
 	var whisper models.Whisper
 	defer cancel()
 
-	objId, _ := primitive.ObjectIDFromHex(whisperId)
-
-	err := whisperCollection.FindOne(ctx, bson.M{"_id": objId}).Decode(&whisper)
+	objId, err := primitive.ObjectIDFromHex(whisperId)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": err.Error()}})
+		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Invalid whisperId format"}})
+	}
+
+	err = whisperCollection.FindOne(ctx, bson.M{"_id": objId}).Decode(&whisper)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return c.JSON(http.StatusNotFound, responses.WhisperResponse{Status: http.StatusNotFound, Message: "error", Data: &echo.Map{"data": "Whisper not found"}})
+		}
+		log.Printf("Error finding whisper %s: %v", whisperId, err)
+		return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": "Database error"}})
 	}
 
 	return c.JSON(http.StatusOK, responses.WhisperResponse{Status: http.StatusOK, Message: "success", Data: &echo.Map{"data": whisper}})
 }
 
 func GetWhispers(c echo.Context) error {
-	radius, _ := strconv.Atoi(c.QueryParam("radius"))
-	location := c.QueryParam("location")
-	realLocation := strings.Split(location, ",")
+	// radiusStr := c.QueryParam("radius")
+	// location := c.QueryParam("location")
+
+	// radius, err := strconv.ParseFloat(radiusStr, 64)
+	// if err != nil || radius <= 0 {
+	// 	log.Printf("Invalid or missing radius '%s', defaulting to 5000 units", radiusStr)
+	// 	radius = 5000
+	// }
+
+	/*locParts := strings.Split(location, ",")
+	if len(locParts) != 2 {
+		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Invalid location format. Expected 'latitude,longitude'"}})
+	}*/
+	// userLat, errLat := strconv.ParseFloat(strings.TrimSpace(locParts[0]), 64)
+	// userLng, errLng := strconv.ParseFloat(strings.TrimSpace(locParts[1]), 64)
+	// if errLat != nil || errLng != nil {
+	// 	return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Invalid latitude or longitude values"}})
+	// }
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	var whisper []models.Whisper
 	defer cancel()
 
-	results, err := whisperCollection.Find(ctx, bson.M{})
-
+	cursor, err := whisperCollection.Find(ctx, bson.M{})
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": err.Error()}})
+		log.Printf("Error finding whispers: %v", err)
+		return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": "Database query error"}})
 	}
+	defer cursor.Close(ctx)
 
-	defer results.Close(ctx)
-	for results.Next(ctx) {
+	var nearbyWhispers []models.Whisper
+	for cursor.Next(ctx) {
 		var singleWhisper models.Whisper
-		if err = results.Decode(&singleWhisper); err != nil {
-			return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": err.Error()}})
+		if err = cursor.Decode(&singleWhisper); err != nil {
+			log.Printf("Error decoding whisper: %v", err)
+			continue
 		}
+		nearbyWhispers = append(nearbyWhispers, singleWhisper)
 
-		userLat, _ := strconv.Atoi(realLocation[0])
-		userLong, _ := strconv.Atoi(realLocation[1])
+		/* whisperLocParts := strings.Split(singleWhisper.Location, ",")
+		if len(whisperLocParts) != 2 {
+			log.Printf("Skipping whisper %s due to invalid location format: %s", singleWhisper.Data, singleWhisper.Location)
+			continue
+		}*/
+		// whisperLat, errWLat := strconv.ParseFloat(strings.TrimSpace(whisperLocParts[0]), 64)
+		// whisperLng, errWLng := strconv.ParseFloat(strings.TrimSpace(whisperLocParts[1]), 64)
+		/* if errWLat != nil || errWLng != nil {
+			log.Printf("Skipping whisper %s due to invalid location values: %s", singleWhisper.Data, singleWhisper.Location)
+			continue
+		} */
+		/*
+			latDiff := whisperLat - userLat
+			lngDiff := whisperLng - userLng
+			distanceSquared := (latDiff * latDiff) + (lngDiff * lngDiff)
+			distanceFromUser := math.Sqrt(distanceSquared) */
 
-		whisperLoc := strings.Split(singleWhisper.Location, ",")
-		whisperLat, _ := strconv.Atoi(whisperLoc[0])
-		whisperLong, _ := strconv.Atoi(whisperLoc[1])
-
-		distanceFromUser := math.Sqrt(math.Pow(float64(whisperLat-userLat), 2) + math.Pow(float64(whisperLong-userLong), 2))
-
-		if distanceFromUser <= float64(radius) {
-			whisper = append(whisper, singleWhisper)
-		}
+		//if distanceFromUser <= radius {
+		//if singleWhisper.AmountListens < singleWhisper.MaxListens {
+		// nearbyWhispers = append(nearbyWhispers, singleWhisper)
+		//	}
+		//}
 	}
 
-	return c.JSON(http.StatusOK, responses.WhisperResponse{Status: http.StatusOK, Message: "success", Data: &echo.Map{"data": whisper}})
+	if err := cursor.Err(); err != nil {
+		log.Printf("Cursor error after iterating whispers: %v", err)
+		return c.JSON(http.StatusInternalServerError, responses.WhisperResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": "Error reading whispers from database"}})
+	}
+
+	return c.JSON(http.StatusOK, responses.WhisperResponse{
+		Status:  http.StatusOK,
+		Message: "success",
+		Data:    &echo.Map{"data": nearbyWhispers},
+	})
 }
 
 --- END FILE: apps/backend/cmd/server/controllers/whisper_controller.go ---
@@ -376,21 +764,22 @@ func main() {
 			http.MethodPatch,
 			http.MethodPost,
 			http.MethodDelete,
-			http.MethodOptions, 
+			http.MethodOptions,
 		},
 
 		AllowHeaders: []string{
 			echo.HeaderOrigin,
 			echo.HeaderContentType,
 			echo.HeaderAccept,
-			echo.HeaderAuthorization, 
+			echo.HeaderAuthorization,
 		},
-
 	}))
 
 	configs.ConnectDB()
+	configs.ConnectMinio()
 
 	routes.UserRoute(e)
+	// routes.UploadRoute(e)
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
@@ -408,12 +797,13 @@ func main() {
 package models
 
 type Whisper struct {
-	Location      string   `json:"location" validate:"required"`
-	Data          string   `json:"data" validate:"required"`
-	DataType      string   `json:"dataType" validate:"required"`
-	MaxListens    int      `json:"maxListens" validate:"required"`
-	AmountListens int      `json:"amountListens" validate:"required"`
-	Emotions      []string `json:"emotions" validate:"required"`
+	Location      string   `json:"Location" validate:""`
+	Data          string   `json:"Data,omitempty"`
+	MediaUrl      string   `json:"MediaUrl,omitempty"`
+	DataType      string   `json:"DataType" validate:"required,oneof=text image video"`
+	MaxListens    int      `json:"MaxListens" validate:"required,gte=1"`
+	AmountListens int      `json:"AmountListens" validate:"gte=0"`
+	Emotions      []string `json:"Emotions" validate:"required,min=1"`
 }
 
 --- END FILE: apps/backend/cmd/server/models/whisper_model.go ---
@@ -432,6 +822,21 @@ type WhisperResponse struct {
 }
 
 --- END FILE: apps/backend/cmd/server/responses/whisper_response.go ---
+
+--- START FILE: apps/backend/cmd/server/routes/upload_routes.go ---
+package routes
+
+import (
+	"github.com/atomisadev/whispr/apps/backend/cmd/server/controllers"
+	"github.com/labstack/echo/v4"
+)
+
+func UploadRoute(e *echo.Echo) {
+	uploadGroup := e.Group("/upload")
+
+	uploadGroup.POST("/video", controllers.UploadVideo)
+}
+--- END FILE: apps/backend/cmd/server/routes/upload_routes.go ---
 
 --- START FILE: apps/backend/cmd/server/routes/whisper_routes.go ---
 package routes
@@ -458,28 +863,40 @@ module github.com/atomisadev/whispr/apps/backend
 go 1.24.2
 
 require (
+	github.com/go-playground/validator/v10 v10.26.0
+	github.com/google/uuid v1.6.0
+	github.com/joho/godotenv v1.5.1
+	github.com/labstack/echo/v4 v4.13.3
+	github.com/minio/minio-go/v7 v7.0.91
+	go.mongodb.org/mongo-driver v1.17.3
+	golang.org/x/net v0.39.0
+)
+
+require (
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.9 // indirect
+	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.26.0 // indirect
+	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
-	github.com/labstack/echo/v4 v4.13.3 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/minio/crc64nvme v1.0.1 // indirect
+	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
+	github.com/rs/xid v1.6.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	go.mongodb.org/mongo-driver v1.17.3 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
-	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
@@ -1101,14 +1518,12 @@ interface LatLngLiteral {
   lng: number;
 }
 
-const DEFAULT_CENTER: LatLngLiteral = { lat: 40.5, lng: -74.5 }; // Default: somewhere in NJ
+const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 }; // Default: somewhere in NJ
 const DEFAULT_ZOOM = 10;
 // Backend expects radius in the same "units" as the coordinate difference calculation.
 // Since the backend calculation is flawed (treats degrees as Cartesian),
 // this radius value might need significant tuning based on observed behavior.
 // A more robust backend would use proper geospatial queries (e.g., meters/km).
-const BACKEND_RADIUS_UNITS = 5 * 100; // Arbitrary scaling factor for the flawed backend calculation. TUNE THIS!
-
 // --- !!! IMPORTANT BACKEND NOTE !!! ---
 // The current backend calculation in GetWhispers treats latitude/longitude degrees
 // as if they were points on a flat Cartesian plane (Euclidean distance).
@@ -1121,8 +1536,10 @@ const BACKEND_RADIUS_UNITS = 5 * 100; // Arbitrary scaling factor for the flawed
 // -------------------------------------
 
 // Helper function to parse location string
+
 const parseLocation = (locationString: string): LatLngLiteral | null => {
   try {
+    console.log(locationString);
     const [latStr, lngStr] = locationString.split(",");
     const lat = parseFloat(latStr);
     const lng = parseFloat(lngStr);
@@ -1133,7 +1550,7 @@ const parseLocation = (locationString: string): LatLngLiteral | null => {
     console.error(`Error parsing location string: ${locationString}`, e);
   }
   return null;
-};
+}; 
 
 export function GoogleMapComponent() {
   const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
@@ -1157,7 +1574,7 @@ export function GoogleMapComponent() {
     const backendUrl = `http://localhost:8080/whispers`; // Or use absolute path
     // ---------------------------------------
 
-    const apiUrl = `${backendUrl}?location="${lat},${lng}"&radius="${BACKEND_RADIUS_UNITS}"`;
+    const apiUrl = backendUrl;
     console.log(`Workspaceing whispers from: ${apiUrl}`);
 
     try {
@@ -1204,7 +1621,6 @@ export function GoogleMapComponent() {
               `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
             );
             setUserLocation(currentLocation);
-            setMapCenter(currentLocation); // Center map on user
             setMapZoom(14); // Zoom in closer
           },
           (err) => {
@@ -1220,11 +1636,12 @@ export function GoogleMapComponent() {
     }, []); // Run only once on mount
 
   // Effect 2: Fetch whispers when user location is known
+  
   useEffect(() => {
     if (userLocation) {
       fetchWhispers(userLocation.lat, userLocation.lng);
     }
-  }, [userLocation, fetchWhispers]); // Re-fetch when location changes
+  }, [userLocation, fetchWhispers]); // Re-fetch when location changes 
 
   // Find the currently selected whisper for the InfoWindow
   const selectedWhisper = whispers.find(
@@ -1246,19 +1663,19 @@ export function GoogleMapComponent() {
     <div className="relative h-full w-full">
       <Map
         mapId={"YOUR_MAP_ID"} // Optional: Create Map ID in Google Cloud Console for custom styles
-        center={mapCenter}
-        zoom={mapZoom}
+        defaultCenter={mapCenter}
+        defaultZoom={mapZoom}
         gestureHandling={"greedy"} // Allows map interaction without holding ctrl/cmd
         disableDefaultUI={false} // Show default controls like zoom, fullscreen
         className="absolute top-0 bottom-0 w-full h-full"
       >
-        {/* Render user's location marker if available */}
+        
         {userLocation && (
           <AdvancedMarker position={userLocation} title={"Your Location"}>
-            {/* You can customize the user marker, e.g., different color Pin */}
             <span style={{ fontSize: "2rem" }}>📍</span>
           </AdvancedMarker>
         )}
+        
 
         {/* Render whisper markers */}
         {whispers.map((whisper) => {
@@ -1273,6 +1690,7 @@ export function GoogleMapComponent() {
               title={`Whisper: ${whisper.Data.substring(0, 30)}...`} // Tooltip on hover
             >
               {/* Default Pin, can be customized */}
+              <span style={{ fontSize: "2rem" }}>📍</span>
               <Pin />
             </AdvancedMarker>
           );

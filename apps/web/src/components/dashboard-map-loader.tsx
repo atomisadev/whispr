@@ -4,6 +4,7 @@
 import React from "react";
 import dynamic from "next/dynamic";
 import { APIProvider } from "@vis.gl/react-google-maps";
+import { Sidepanel } from "./side-panel";
 
 // Define the dynamic import *inside* the client component
 const DynamicMapComponent = dynamic(
@@ -33,11 +34,10 @@ export default function DashboardMapLoader() {
   }
 
   return (
-    // APIProvider wraps the actual map usage
     <APIProvider apiKey={googleMapsApiKey}>
-      <div className="h-full w-full">
-        <DynamicMapComponent />
-      </div>
+        <div className="h-full w-full">
+          <DynamicMapComponent />
+        </div>
     </APIProvider>
   );
 }

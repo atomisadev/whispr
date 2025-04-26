@@ -23,8 +23,10 @@
   ],
   "dependencies": {
     "@types/mapbox-gl": "^3.4.1",
+    "fs": "^0.0.1-security",
     "gl-matrix": "^3.4.3",
     "mapbox-gl": "^3.11.1",
+    "minio": "^8.0.5",
     "mongodb": "^6.16.0",
     "react-mapbox-gl": "^5.1.1"
   }

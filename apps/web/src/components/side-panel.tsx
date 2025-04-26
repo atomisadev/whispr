@@ -1,20 +1,11 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import Image from 'next/image'
 import {
   Map,
   AdvancedMarker,
 } from "@vis.gl/react-google-maps";
-import * as Minio from "minio";
 
-const minioClient = new Minio.Client({
-  endPoint: 'http://20.115.91.105',
-  port: 9000,
-  useSSL: false,
-  accessKey: 'zBElw10A652cYKioXDqD',
-  secretKey: 'lB7FVIXiQ0zG4hWg0AWC5ZndnCYQEWGvkpR59orz',
-})
 
 interface Whisper {
   Location: string;
@@ -42,6 +33,27 @@ interface LatLngLiteral {
 
 const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 };
 const DEFAULT_ZOOM = 10;
+
+// function addNewWhisper(whisper: Whisper) {
+//   console.log("Adding new whisper:", whisper);
+  
+//   fetch('http://localhost:8080/whisper', {
+//     method: 'POST',
+//     headers: {
+//       'Content-Type': 'application/json',
+//     },
+//     body: JSON.stringify(whisper),
+//   })
+//     .then(response => response.json())
+//     .then(data => {
+//       console.log('Success:', data);
+//     })
+//     .catch((error) => {
+//       console.error('Error:', error);
+//     });
+  
+//     GoogleMapComponent();
+// }
 
 const parseLocation = (locationString: string): LatLngLiteral | null => {
   try {
@@ -78,7 +90,7 @@ const parseLocation = (locationString: string): LatLngLiteral | null => {
   return null;
 };
 
-export async function GoogleMapComponent() {
+export function Sidepanel() {
   const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
   const [mapCenter, setMapCenter] = useState<LatLngLiteral>(DEFAULT_CENTER);
   const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
@@ -181,70 +193,37 @@ export async function GoogleMapComponent() {
     );
   }
 
+  whispers.map((whisper) => {
+    const position = parseLocation(whisper.Location);
+    if (!position) return null;
+
+    return (
+      <AdvancedMarker
+        key={whisper._id}
+        position={position}
+        onClick={() => {
+          
+          setSelectedWhisper(whisper);
+        }}
+        title={`Whisper: ${whisper.Data.substring(0, 30)}...`}
+      >
+        <div
+          style={{
+            width: "20px",
+            height: "20px",
+            backgroundColor: "red",
+            border: "2px solid black",
+            borderRadius: "50%",
+            cursor: "pointer",
+          }}
+        />
+      </AdvancedMarker>
+    );
+  })
+
   return (
-    <div className="grid grid-cols-3 grid-row-1 h-full gap-4">
-      {/* Google Map Section */}
-      <div className="col-span-2">
-        <Map
-          mapId={"MAP_ID"}
-          defaultCenter={mapCenter}
-          streetViewControl={false}
-          gestureHandling={"greedy"}
-          disableDefaultUI={false}
-          className={"h-full"}
-        >
-          {userLocation && (
-            <AdvancedMarker position={userLocation} title={"Your Location"}>
-              <div
-                style={{
-                  width: "15px",
-                  height: "15px",
-                  backgroundColor: "blue",
-                  border: "2px solid white",
-                  borderRadius: "50%",
-                  boxShadow: "0 0 5px rgba(0, 0, 255, 0.5)",
-                }}
-              ></div>
-            </AdvancedMarker>
-          )}
 
-          {/* Render whisper markers */}
-          {whispers.map((whisper) => {
-            const position = parseLocation(whisper.Location);
-            if (!position) return null;
-
-            return (
-              <AdvancedMarker
-                key={whisper._id}
-                position={position}
-                onClick={() => {
-                  
-                  setSelectedWhisper(whisper);
-                }}
-                title={`Whisper: ${whisper.Data.substring(0, 30)}...`}
-              >
-                <div
-                  style={{
-                    width: "20px",
-                    height: "20px",
-                    backgroundColor: "red",
-                    border: "2px solid black",
-                    borderRadius: "50%",
-                    cursor: "pointer",
-                  }}
-                />
-              </AdvancedMarker>
-            );
-          })}
-        </Map>
-        {isLoading && (
-          <div className="absolute top-2 left-2 bg-white bg-opacity-80 p-2 rounded shadow z-10">
-            Loading whispers...
-          </div>
-        )}
-      </div>
-
-      <div className="col-span-1 bg-gray-100 p-4 border-l border-gray-300 overflow-y-auto">
+      <div className="bg-gray-100 p-4 border-l h-full border-gray-300 overflow-y-auto">
         <h2 className="text-xl font-semibold mb-4">Whisper Details</h2>
         {selectedWhisper ? (
           <div>
@@ -257,7 +236,7 @@ export async function GoogleMapComponent() {
             {selectedWhisper.DataType === "image" &&
               selectedWhisper.MediaUrl && (
                 <img
-                  src={await minioClient.presignedGetObject("whispers", selectedWhisper.MediaUrl)}
+                  src={selectedWhisper.MediaUrl}
                   alt="Whisper content"
                   className="w-full h-auto rounded mb-3"
                 />
@@ -297,7 +276,6 @@ export async function GoogleMapComponent() {
           <p className="text-gray-500">Click a marker to view details.</p>
         )}
         <button className="p-8 m-12 bg-black text-white">Upload</button>
-      </div>
     </div>
   );
 }

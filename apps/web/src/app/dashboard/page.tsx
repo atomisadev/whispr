@@ -2,6 +2,7 @@
 import { auth } from "@clerk/nextjs/server";
 import DashboardMapLoader from "@/components/dashboard-map-loader"; // Import the new client component loader
 
+
 // No need for dynamic or APIProvider imports here anymore
 
 export default async function DashboardPage() {

@@ -1,19 +1,28 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
+import dynamic from "next/dynamic";
+
+const DynamicMapComponent = dynamic(
+  () => import("@/components/mapbox").then((mod) => mod.MapComponent),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        Loading map...
+      </div>
+    ),
+  }
+);
 
 export default async function DashboardPage() {
   const { userId } = await auth();
-  const user = await currentUser();
 
-  if (!userId || !user) {
-    // ideally shouldn't be reached if the middleware is doing its job but like why not
-    return <div>Redirecting...</div>;
+  if (!userId) {
+    return null;
   }
 
   return (
-    <div>
-      <h2>Welcome to the dasboard {user.firstName || user.username}!</h2>
-      <p>This is a protected area</p>
-      <p>Your User ID is: {userId}</p>
+    <div className="h-full w-full">
+      {" "}
+      <DynamicMapComponent />
     </div>
   );
 }

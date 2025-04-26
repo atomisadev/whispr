@@ -1,0 +1,52 @@
+[
+  {
+    "filename": "video1.mp4",
+    "emotion": "happiness",
+    "location": "40.6945257,-74.5460310"
+  },
+  {
+    "filename": "video2.mp4",
+    "emotion": "nostalgia/happiness",
+    "location": "40.6950885,-74.5466402"
+  },
+  {
+    "filename": "video3.mp4",
+    "emotion": "craving/longing",
+    "location": "40.6950821,-74.5469624"
+  },
+  {
+    "filename": "video5.mp4",
+    "emotion": "resentment",
+    "location": "40.6945455,-74.5472085"
+  },
+  {
+    "filename": "video6.mp4",
+    "emotion": "awe",
+    "location": "40.6943190,-74.5474603"
+  },
+  {
+    "filename": "video7.mp4",
+    "emotion": "fear",
+    "location": "40.6941080,-74.5475689"
+  },
+  {
+    "filename": "video8.mp4",
+    "emotion": "anger",
+    "location": "40.6941289,-74.5474955"
+  },
+  {
+    "filename": "video9.mp4",
+    "emotion": "vulnerability",
+    "location": "40.6942278,-74.5471961"
+  },
+  {
+    "filename": "video10.mp4",
+    "emotion": "happiness",
+    "location": "40.6945697,-74.5472591"
+  },
+  {
+    "filename": "video11.mp4",
+    "emotion": "uneasiness",
+    "location": "40.6943129,-74.5467240"
+  }
+]

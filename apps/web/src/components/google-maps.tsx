@@ -86,11 +86,11 @@ export function GoogleMapComponent() {
     setWhispers([]); // Clear previous whispers
 
     // --- Adjust Backend URL if necessary ---
-    const backendUrl = `/api/whispers`; // Use relative path assumes proxy/same-origin
-    // const backendUrl = `http://localhost:8080/whispers`; // Or use absolute path
+    // const backendUrl = `/api/whispers`; // Use relative path assumes proxy/same-origin
+    const backendUrl = `http://localhost:8080/whispers`; // Or use absolute path
     // ---------------------------------------
 
-    const apiUrl = `${backendUrl}?location=${lat},${lng}&radius=${BACKEND_RADIUS_UNITS}`;
+    const apiUrl = `${backendUrl}?location="${lat},${lng}"&radius="${BACKEND_RADIUS_UNITS}"`;
     console.log(`Workspaceing whispers from: ${apiUrl}`);
 
     try {
@@ -127,30 +127,30 @@ export function GoogleMapComponent() {
   }, []); // No dependencies needed here as it reads state directly when called
 
   // Effect 1: Get User's Initial Location
-  //   useEffect(() => {
-  //     if (navigator.geolocation) {
-  //       navigator.geolocation.getCurrentPosition(
-  //         (position) => {
-  //           const { latitude, longitude } = position.coords;
-  //           const currentLocation = { lat: latitude, lng: longitude };
-  //           console.log(
-  //             `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
-  //           );
-  //           setUserLocation(currentLocation);
-  //           setMapCenter(currentLocation); // Center map on user
-  //           setMapZoom(14); // Zoom in closer
-  //         },
-  //         (err) => {
-  //           console.warn(`Geolocation Error (${err.code}): ${err.message}`);
-  //           setError("Unable to retrieve location. Showing default area.");
-  //           // Keep default center if geolocation fails
-  //         },
-  //         { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-  //       );
-  //     } else {
-  //       setError("Geolocation is not supported by this browser.");
-  //     }
-  //   }, []); // Run only once on mount
+    useEffect(() => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const currentLocation = { lat: latitude, lng: longitude };
+            console.log(
+              `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
+            );
+            setUserLocation(currentLocation);
+            setMapCenter(currentLocation); // Center map on user
+            setMapZoom(14); // Zoom in closer
+          },
+          (err) => {
+            console.warn(`Geolocation Error (${err.code}): ${err.message}`);
+            setError("Unable to retrieve location. Showing default area.");
+            // Keep default center if geolocation fails
+          },
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+      } else {
+        setError("Geolocation is not supported by this browser.");
+      }
+    }, []); // Run only once on mount
 
   // Effect 2: Fetch whispers when user location is known
   useEffect(() => {

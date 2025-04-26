@@ -31,6 +31,8 @@ Exported File Structure:
 │       ├── next.config.ts
 │       ├── package.json
 │       ├── postcss.config.mjs
+│       ├── public
+│       │   └── code.json
 │       ├── src
 │       │   ├── app
 │       │   │   ├── (auth)
@@ -49,7 +51,8 @@ Exported File Structure:
 │       │   ├── components
 │       │   │   ├── dashboard-map-loader.tsx
 │       │   │   ├── google-maps.tsx
-│       │   │   └── mapbox.tsx
+│       │   │   ├── mapbox.tsx
+│       │   │   └── side-panel.tsx
 │       │   ├── lib
 │       │   │   └── utils.ts
 │       │   └── middleware.ts
@@ -1022,6 +1025,12 @@ const nextConfig: NextConfig = {
 
 export default nextConfig;
 
+module.exports = {
+  images: {
+    remotePatterns: [new URL('http://20.115.91.105/whispers/**')],
+  },
+}
+
 --- END FILE: apps/web/next.config.ts ---
 
 --- START FILE: apps/web/package.json ---
@@ -1058,6 +1067,7 @@ export default nextConfig;
     "tw-animate-css": "^1.2.8",
     "typescript": "^5"
   }
+
 }
 
 --- END FILE: apps/web/package.json ---
@@ -1070,6 +1080,62 @@ const config = {
 export default config;
 
 --- END FILE: apps/web/postcss.config.mjs ---
+
+--- START FILE: apps/web/public/code.json ---
+[
+  {
+    "filename": "video1.mp4",
+    "emotion": "happiness",
+    "location": "40.6945257,-74.5460310"
+  },
+  {
+    "filename": "video2.mp4",
+    "emotion": "nostalgia/happiness",
+    "location": "40.6950885,-74.5466402"
+  },
+  {
+    "filename": "video3.mp4",
+    "emotion": "craving/longing",
+    "location": "40.6950821,-74.5469624"
+  },
+  {
+    "filename": "video5.mp4",
+    "emotion": "resentment",
+    "location": "40.6945455,-74.5472085"
+  },
+  {
+    "filename": "video6.mp4",
+    "emotion": "awe",
+    "location": "40.6943190,-74.5474603"
+  },
+  {
+    "filename": "video7.mp4",
+    "emotion": "fear",
+    "location": "40.6941080,-74.5475689"
+  },
+  {
+    "filename": "video8.mp4",
+    "emotion": "anger",
+    "location": "40.6941289,-74.5474955"
+  },
+  {
+    "filename": "video9.mp4",
+    "emotion": "vulnerability",
+    "location": "40.6942278,-74.5471961"
+  },
+  {
+    "filename": "video10.mp4",
+    "emotion": "happiness",
+    "location": "40.6945697,-74.5472591"
+  },
+  {
+    "filename": "video11.mp4",
+    "emotion": "uneasiness",
+    "location": "40.6943129,-74.5467240"
+  }
+]
+
+--- END FILE: apps/web/public/code.json ---
 
 --- START FILE: apps/web/src/app/(auth)/sign-in/[[...sign-in]]/page.tsx ---
 import { SignIn } from "@clerk/nextjs";
@@ -1114,16 +1180,17 @@ export default function Page() {
 --- START FILE: apps/web/src/app/dashboard/layout.tsx ---
 import React from "react";
 import { UserButton } from "@clerk/nextjs";
-
+import  Image  from "next/image";
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col h-screen" suppressHydrationWarning>
-      <header className="flex-shrink-0 flex justify-between items-center p-4 border-b bg-white dark:bg-gray-800 dark:border-gray-700">
-        <h1 className="text-xl font-semibold">Whispr Dashboard</h1>
+    <div className="flex flex-col h-screen bg-[#0F2026]" suppressHydrationWarning>
+      <header className="flex-shrink-0 flex justify-between items-center p-4 border-b dark:bg-gray-800 dark:border-gray-700">
+        {/* <h1 className="text-xl font-semibold">Whispr Dashboard</h1> */}
+        <Image src="/logo.svg" alt="Logo" width={100} height={50} />
         <UserButton afterSignOutUrl="/" />
       </header>
       <main className="flex-grow overflow-auto">{children}</main>
@@ -1137,6 +1204,7 @@ export default function DashboardLayout({
 // apps/web/src/app/dashboard/page.tsx
 import { auth } from "@clerk/nextjs/server";
 import DashboardMapLoader from "@/components/dashboard-map-loader"; // Import the new client component loader
+
 
 // No need for dynamic or APIProvider imports here anymore
 
@@ -1333,30 +1401,14 @@ export default async function Home() {
   const { userId } = await auth();
 
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
+    <div className="grid grid-rows-[20px_1fr_20px] bg-[#0F2026] bg-[url(/bg.svg)] bg-cover items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+      <main className="flex flex-col gap-[32px] row-start-2 items-center  sm:items-start">
+        <div className="flex gap-4 items-center flex-col">
+          <Image
+            src="/logo.svg"
+            alt="Logo"
+            width={600}
+            height={50}/>
           {!userId ? (
             // Show sign-in/sign-up if not logged in
             <>
@@ -1381,53 +1433,6 @@ export default async function Home() {
           )}
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
@@ -1441,6 +1446,7 @@ export default async function Home() {
 import React from "react";
 import dynamic from "next/dynamic";
 import { APIProvider } from "@vis.gl/react-google-maps";
+import { Sidepanel } from "./side-panel";
 
 // Define the dynamic import *inside* the client component
 const DynamicMapComponent = dynamic(
@@ -1470,11 +1476,10 @@ export default function DashboardMapLoader() {
   }
 
   return (
-    // APIProvider wraps the actual map usage
     <APIProvider apiKey={googleMapsApiKey}>
-      <div className="h-full w-full">
-        <DynamicMapComponent />
-      </div>
+        <div className="h-full w-full">
+          <DynamicMapComponent />
+        </div>
     </APIProvider>
   );
 }
@@ -1482,29 +1487,106 @@ export default function DashboardMapLoader() {
 --- END FILE: apps/web/src/components/dashboard-map-loader.tsx ---
 
 --- START FILE: apps/web/src/components/google-maps.tsx ---
-// apps/web/src/components/google-map.tsx
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
 import {
   Map,
   AdvancedMarker,
-  Pin,
-  InfoWindow,
 } from "@vis.gl/react-google-maps";
 
-// Define the structure of a Whisper (same as before)
+const darkModeStyle = [
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  {
+    featureType: "administrative.locality",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#263c3f" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6b9a76" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#38414e" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#212a37" }],
+  },
+  {
+    featureType: "road",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9ca5b3" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#746855" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#1f2835" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#f3d19c" }],
+  },
+  {
+    featureType: "transit",
+    elementType: "geometry",
+    stylers: [{ color: "#2f3948" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#17263c" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#515c6d" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#17263c" }],
+  },
+];
+
 interface Whisper {
-  Location: string; // "latitude,longitude"
-  Data: string;
+  Location: string;
   DataType: string;
+  Data: string;
   MaxListens: number;
   AmountListens: number;
   Emotions: string[];
   _id: string;
+  MediaUrl?: string;
 }
 
-// Define the structure for the backend API response (same as before)
 interface WhisperApiResponse {
   status: number;
   message: string;
@@ -1518,39 +1600,43 @@ interface LatLngLiteral {
   lng: number;
 }
 
-const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 }; // Default: somewhere in NJ
-const DEFAULT_ZOOM = 10;
-// Backend expects radius in the same "units" as the coordinate difference calculation.
-// Since the backend calculation is flawed (treats degrees as Cartesian),
-// this radius value might need significant tuning based on observed behavior.
-// A more robust backend would use proper geospatial queries (e.g., meters/km).
-// --- !!! IMPORTANT BACKEND NOTE !!! ---
-// The current backend calculation in GetWhispers treats latitude/longitude degrees
-// as if they were points on a flat Cartesian plane (Euclidean distance).
-// This is inaccurate for calculating real-world distances on a sphere.
-// For accurate results, the backend should use:
-// 1. MongoDB's geospatial queries ($nearSphere with a 2dsphere index).
-// 2. Haversine formula or similar geodetic calculations if not using DB queries.
-// The `BACKEND_RADIUS_UNITS` constant above is a crude attempt to map KM to
-// the backend's flawed unit system and WILL require tuning.
-// -------------------------------------
-
-// Helper function to parse location string
+const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 };
+const DEFAULT_ZOOM = 8; // Changed default zoom to a more reasonable value
 
 const parseLocation = (locationString: string): LatLngLiteral | null => {
   try {
-    console.log(locationString);
-    const [latStr, lngStr] = locationString.split(",");
+    const parts = locationString.split(",");
+    if (parts.length !== 2) {
+      console.error(
+        `Invalid location string format (expected one comma): "${locationString}"`
+      );
+      return null;
+    }
+    const latStr = parts[0].trim();
+    const lngStr = parts[1].trim();
     const lat = parseFloat(latStr);
     const lng = parseFloat(lngStr);
-    if (!isNaN(lat) && !isNaN(lng)) {
+
+    if (
+      !isNaN(lat) &&
+      !isNaN(lng) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180
+    ) {
       return { lat, lng };
+    } else {
+      console.error(
+        `Invalid number format or range: lat='${latStr}', lng='${lngStr}' from string "${locationString}"`
+      );
+      return null;
     }
   } catch (e) {
-    console.error(`Error parsing location string: ${locationString}`, e);
+    console.error(`Error parsing location string: "${locationString}"`, e);
   }
   return null;
-}; 
+};
 
 export function GoogleMapComponent() {
   const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
@@ -1559,23 +1645,15 @@ export function GoogleMapComponent() {
   const [whispers, setWhispers] = useState<Whisper[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [openInfoWindowMarkerId, setOpenInfoWindowMarkerId] = useState<
-    string | null
-  >(null);
+  const [selectedWhisper, setSelectedWhisper] = useState<Whisper | null>(null);
 
-  // Function to fetch whispers (mostly unchanged, uses userLocation state)
-  const fetchWhispers = useCallback(async (lat: number, lng: number) => {
+  const fetchWhispers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    setWhispers([]); // Clear previous whispers
 
-    // --- Adjust Backend URL if necessary ---
-    // const backendUrl = `/api/whispers`; // Use relative path assumes proxy/same-origin
-    const backendUrl = `http://localhost:8080/whispers`; // Or use absolute path
-    // ---------------------------------------
-
+    const backendUrl = `http://localhost:8080/whispers`;
     const apiUrl = backendUrl;
-    console.log(`Workspaceing whispers from: ${apiUrl}`);
+    console.log(`Fetching whispers from: ${apiUrl}`);
 
     try {
       const response = await fetch(apiUrl);
@@ -1586,8 +1664,18 @@ export function GoogleMapComponent() {
       console.log("API Response:", result);
 
       if (result.status >= 200 && result.status < 300 && result.data?.data) {
-        setWhispers(result.data.data);
+        const validWhispers = result.data.data.filter((w) => {
+          const pos = parseLocation(w.Location);
+          if (!pos) {
+            console.warn(
+              `Skipping whisper with invalid location: ${w._id}, Location: "${w.Location}"`
+            );
+          }
+          return !!pos;
+        });
+        setWhispers(validWhispers);
       } else {
+        setWhispers([]);
         if (result.status >= 200 && result.status < 300) {
           console.log(
             "API returned success but no whispers found in the response data."
@@ -1608,50 +1696,41 @@ export function GoogleMapComponent() {
     } finally {
       setIsLoading(false);
     }
-  }, []); // No dependencies needed here as it reads state directly when called
+  }, []);
 
-  // Effect 1: Get User's Initial Location
-    useEffect(() => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            const currentLocation = { lat: latitude, lng: longitude };
-            console.log(
-              `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
-            );
-            setUserLocation(currentLocation);
-            setMapZoom(14); // Zoom in closer
-          },
-          (err) => {
-            console.warn(`Geolocation Error (${err.code}): ${err.message}`);
-            setError("Unable to retrieve location. Showing default area.");
-            // Keep default center if geolocation fails
-          },
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-      } else {
-        setError("Geolocation is not supported by this browser.");
-      }
-    }, []); // Run only once on mount
-
-  // Effect 2: Fetch whispers when user location is known
-  
   useEffect(() => {
-    if (userLocation) {
-      fetchWhispers(userLocation.lat, userLocation.lng);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const currentLocation = { lat: latitude, lng: longitude };
+          console.log(
+            `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
+          );
+          setUserLocation(currentLocation);
+          setMapCenter(currentLocation);
+          setMapZoom(8); // Zoom in closer when user location is found
+        },
+        (err) => {
+          console.warn(`Geolocation Error (${err.code}): ${err.message}`);
+          setError("Unable to retrieve location. Showing default area.");
+          setMapCenter(DEFAULT_CENTER);
+          setMapZoom(DEFAULT_ZOOM);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    } else {
+      setError("Geolocation is not supported by this browser.");
+      setMapCenter(DEFAULT_CENTER);
+      setMapZoom(DEFAULT_ZOOM);
     }
-  }, [userLocation, fetchWhispers]); // Re-fetch when location changes 
+  }, []);
 
-  // Find the currently selected whisper for the InfoWindow
-  const selectedWhisper = whispers.find(
-    (w) => w._id === openInfoWindowMarkerId
-  );
-  const selectedWhisperLocation = selectedWhisper
-    ? parseLocation(selectedWhisper.Location)
-    : null;
+  useEffect(() => {
+    fetchWhispers();
+  }, [fetchWhispers]);
 
-  if (error) {
+  if (error && !isLoading) {
     return (
       <div className="flex items-center justify-center h-full text-red-500 p-4">
         Error: {error}
@@ -1660,66 +1739,124 @@ export function GoogleMapComponent() {
   }
 
   return (
-    <div className="relative h-full w-full">
-      <Map
-        mapId={"YOUR_MAP_ID"} // Optional: Create Map ID in Google Cloud Console for custom styles
-        defaultCenter={mapCenter}
-        defaultZoom={mapZoom}
-        gestureHandling={"greedy"} // Allows map interaction without holding ctrl/cmd
-        disableDefaultUI={false} // Show default controls like zoom, fullscreen
-        className="absolute top-0 bottom-0 w-full h-full"
-      >
-        
-        {userLocation && (
-          <AdvancedMarker position={userLocation} title={"Your Location"}>
-            <span style={{ fontSize: "2rem" }}>📍</span>
-          </AdvancedMarker>
-        )}
-        
-
-        {/* Render whisper markers */}
-        {whispers.map((whisper) => {
-          const position = parseLocation(whisper.Location);
-          if (!position) return null; // Skip if location is invalid
-
-          return (
-            <AdvancedMarker
-              key={whisper._id}
-              position={position}
-              onClick={() => setOpenInfoWindowMarkerId(whisper._id)}
-              title={`Whisper: ${whisper.Data.substring(0, 30)}...`} // Tooltip on hover
-            >
-              {/* Default Pin, can be customized */}
-              <span style={{ fontSize: "2rem" }}>📍</span>
-              <Pin />
+    <div className="grid grid-cols-3 grid-row-1 h-full gap-4">
+      {/* Google Map Section */}
+      <div className="col-span-2">
+        <Map
+          mapId={"MAP_ID"}
+          center={mapCenter} // Use the state for center
+          streetViewControl={false}
+          defaultZoom={15}
+          gestureHandling={"greedy"}
+          disableDefaultUI={false}
+          className={"h-full"}
+        >
+          {userLocation && (
+            <AdvancedMarker position={userLocation} title={"Your Location"}>
+              <div
+                style={{
+                  width: "15px",
+                  height: "15px",
+                  backgroundColor: "blue",
+                  border: "2px solid white",
+                  borderRadius: "50%",
+                  boxShadow: "0 0 5px rgba(0, 0, 255, 0.5)",
+                }}
+              ></div>
             </AdvancedMarker>
-          );
-        })}
+          )}
+          {
+          whispers.map((whisper) => {
+            const position = parseLocation(whisper.Location);
+            if (!position) return null;
 
-        {/* Render InfoWindow for the selected marker */}
-        {selectedWhisper && selectedWhisperLocation && (
-          <InfoWindow
-            position={selectedWhisperLocation}
-            pixelOffset={[0, -40]} // Adjust offset to position above marker pin
-            onCloseClick={() => setOpenInfoWindowMarkerId(null)}
-          >
-            <div style={{ maxWidth: "200px" }}>
-              <h3>Whisper</h3>
-              <p>{selectedWhisper.Data}</p>
-              <small>Emotions: {selectedWhisper.Emotions.join(", ")}</small>
-            </div>
-          </InfoWindow>
+            return (
+              <AdvancedMarker
+                key={whisper._id}
+                position={position}
+                onClick={() => {
+                  setSelectedWhisper(whisper);
+                }}
+                title={`Whisper: ${whisper.Data.substring(0, 30)}...`}
+              >
+                <div
+                  style={{
+                    width: "20px",
+                    height: "20px",
+                    backgroundColor: "#0F2026",
+                    border: "2px solid black",
+                    borderRadius: "50%",
+                    cursor: "pointer",
+                  }}
+                />
+              </AdvancedMarker>
+            );
+          })}
+        </Map>
+        {isLoading && (
+          <div className="absolute top-2 left-2 bg-opacity-80 p-2 rounded shadow z-10">
+            Loading whispers...
+          </div>
         )}
-      </Map>
-      {isLoading && (
-        <div className="absolute top-2 left-2 bg-white bg-opacity-80 p-2 rounded shadow z-10">
-          Loading whispers...
-        </div>
-      )}
+      </div>
+
+      <div className="col-span-1 p-4 border-l border-gray-300 overflow-y-auto">
+        <h2 className="text-xl font-semibold mb-4">Whisper Details</h2>
+        {selectedWhisper ? (
+          <div>
+            <h3 className="text-lg font-semibold mb-2">
+              ({selectedWhisper.DataType})
+            </h3>
+            {selectedWhisper.DataType === "text" && (
+              <p className="mb-3">{selectedWhisper.Data}</p>
+            )}
+            {selectedWhisper.DataType === "image" &&
+              selectedWhisper.MediaUrl && (
+                <img
+                  src={selectedWhisper.MediaUrl}
+                  alt="Whisper content"
+                  className="w-full h-auto rounded mb-3"
+                />
+              )}
+            {selectedWhisper.DataType === "video" &&
+              selectedWhisper.MediaUrl && (
+                <video
+                  controls
+                  src={selectedWhisper.MediaUrl}
+                  className="w-full h-auto rounded mb-3"
+                >
+                  Your browser does not support the video tag.
+                </video>
+              )}
+            {selectedWhisper.Data &&
+              (selectedWhisper.DataType === "image" ||
+                selectedWhisper.DataType === "video") && (
+                <p className="italic text-gray-600 mb-3">
+                  {selectedWhisper.Data}
+                </p>
+              )}
+            <p className="text-sm text-gray-700 mb-1">
+              Emotions: {selectedWhisper.Emotions.join(", ") || "None"}
+            </p>
+            <p className="text-sm text-gray-700">
+              Listens: {selectedWhisper.AmountListens}/
+              {selectedWhisper.MaxListens}
+            </p>
+            <button
+              onClick={() => setSelectedWhisper(null)}
+              className="mt-4 px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded text-gray-800"
+            >
+              Clear Selection
+            </button>
+          </div>
+        ) : (
+          <p className="text-gray-500">Click a marker to view details.</p>
+        )}
+        <button className="p-8 m-12 bg-black text-white">Upload</button>
+      </div>
     </div>
   );
 }
-
 --- END FILE: apps/web/src/components/google-maps.tsx ---
 
 --- START FILE: apps/web/src/components/mapbox.tsx ---
@@ -1974,6 +2111,290 @@ export function MapComponent() {
 
 --- END FILE: apps/web/src/components/mapbox.tsx ---
 
+--- START FILE: apps/web/src/components/side-panel.tsx ---
+"use client";
+
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import {
+  Map,
+  AdvancedMarker,
+} from "@vis.gl/react-google-maps";
+
+
+interface Whisper {
+  Location: string;
+  DataType: string;
+  Data: string;
+  MaxListens: number;
+  AmountListens: number;
+  Emotions: string[];
+  _id: string;
+  MediaUrl?: string;
+}
+
+interface WhisperApiResponse {
+  status: number;
+  message: string;
+  data?: {
+    data: Whisper[];
+  };
+}
+
+interface LatLngLiteral {
+  lat: number;
+  lng: number;
+}
+
+const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 };
+const DEFAULT_ZOOM = 10;
+
+// function addNewWhisper(whisper: Whisper) {
+//   console.log("Adding new whisper:", whisper);
+  
+//   fetch('http://localhost:8080/whisper', {
+//     method: 'POST',
+//     headers: {
+//       'Content-Type': 'application/json',
+//     },
+//     body: JSON.stringify(whisper),
+//   })
+//     .then(response => response.json())
+//     .then(data => {
+//       console.log('Success:', data);
+//     })
+//     .catch((error) => {
+//       console.error('Error:', error);
+//     });
+  
+//     GoogleMapComponent();
+// }
+
+const parseLocation = (locationString: string): LatLngLiteral | null => {
+  try {
+    const parts = locationString.split(",");
+    if (parts.length !== 2) {
+      console.error(
+        `Invalid location string format (expected one comma): "${locationString}"`
+      );
+      return null;
+    }
+    const latStr = parts[0].trim();
+    const lngStr = parts[1].trim();
+    const lat = parseFloat(latStr);
+    const lng = parseFloat(lngStr);
+
+    if (
+      !isNaN(lat) &&
+      !isNaN(lng) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180
+    ) {
+      return { lat, lng };
+    } else {
+      console.error(
+        `Invalid number format or range: lat='${latStr}', lng='${lngStr}' from string "${locationString}"`
+      );
+      return null;
+    }
+  } catch (e) {
+    console.error(`Error parsing location string: "${locationString}"`, e);
+  }
+  return null;
+};
+
+export function Sidepanel() {
+  const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
+  const [mapCenter, setMapCenter] = useState<LatLngLiteral>(DEFAULT_CENTER);
+  const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
+  const [whispers, setWhispers] = useState<Whisper[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedWhisper, setSelectedWhisper] = useState<Whisper | null>(null);
+
+  // Function to fetch  (mostly unchanged, uses userLocation state)
+  const fetchWhispers = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    const backendUrl = `http://localhost:8080/whispers`;
+    const apiUrl = backendUrl;
+    console.log(`Fetching whispers from: ${apiUrl}`);
+
+    try {
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const result: WhisperApiResponse = await response.json();
+      console.log("API Response:", result);
+
+      if (result.status >= 200 && result.status < 300 && result.data?.data) {
+        const validWhispers = result.data.data.filter((w) => {
+          const pos = parseLocation(w.Location);
+          if (!pos) {
+            console.warn(
+              `Skipping whisper with invalid location: ${w._id}, Location: "${w.Location}"`
+            );
+          }
+          return !!pos;
+        });
+        setWhispers(validWhispers);
+      } else {
+        setWhispers([]);
+        if (result.status >= 200 && result.status < 300) {
+          console.log(
+            "API returned success but no whispers found in the response data."
+          );
+          setWhispers([]);
+        } else {
+          throw new Error(result.message || "Failed to fetch whispers");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch whispers:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An unknown error occurred fetching whispers"
+      );
+      setWhispers([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []); // No dependencies needed here as it reads state directly when called
+
+  // Effect 1: Get User's Initial Location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const currentLocation = { lat: latitude, lng: longitude };
+          console.log(
+            `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
+          );
+          setUserLocation(currentLocation);
+          setMapCenter(currentLocation);
+          setMapZoom(14); // Zoom in closer
+        },
+        (err) => {
+          console.warn(`Geolocation Error (${err.code}): ${err.message}`);
+          setError("Unable to retrieve location. Showing default area.");
+          // Keep default center if geolocation fails
+          setMapCenter(DEFAULT_CENTER);
+          setMapZoom(DEFAULT_ZOOM);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    } else {
+      setError("Geolocation is not supported by this browser.");
+      setMapCenter(DEFAULT_CENTER);
+      setMapZoom(DEFAULT_ZOOM);
+    }
+  }, []); 
+
+  useEffect(() => {
+    fetchWhispers();
+  }, [fetchWhispers]); 
+
+  if (error && !isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full text-red-500 p-4">
+        Error: {error}
+      </div>
+    );
+  }
+
+  whispers.map((whisper) => {
+    const position = parseLocation(whisper.Location);
+    if (!position) return null;
+
+    return (
+      <AdvancedMarker
+        key={whisper._id}
+        position={position}
+        onClick={() => {
+          
+          setSelectedWhisper(whisper);
+        }}
+        title={`Whisper: ${whisper.Data.substring(0, 30)}...`}
+      >
+        <div
+          style={{
+            width: "20px",
+            height: "20px",
+            backgroundColor: "red",
+            border: "2px solid black",
+            borderRadius: "50%",
+            cursor: "pointer",
+          }}
+        />
+      </AdvancedMarker>
+    );
+  })
+
+  return (
+
+      <div className="bg-gray-100 p-4 border-l h-full border-gray-300 overflow-y-auto">
+        <h2 className="text-xl font-semibold mb-4">Whisper Details</h2>
+        {selectedWhisper ? (
+          <div>
+            <h3 className="text-lg font-semibold mb-2">
+              ({selectedWhisper.DataType})
+            </h3>
+            {selectedWhisper.DataType === "text" && (
+              <p className="mb-3">{selectedWhisper.Data}</p>
+            )}
+            {selectedWhisper.DataType === "image" &&
+              selectedWhisper.MediaUrl && (
+                <img
+                  src={selectedWhisper.MediaUrl}
+                  alt="Whisper content"
+                  className="w-full h-auto rounded mb-3"
+                />
+              )}
+            {selectedWhisper.DataType === "video" &&
+              selectedWhisper.MediaUrl && (
+                <video
+                  controls
+                  src={selectedWhisper.MediaUrl}
+                  className="w-full h-auto rounded mb-3"
+                >
+                  Your browser does not support the video tag.
+                </video>
+              )}
+            {selectedWhisper.Data &&
+              (selectedWhisper.DataType === "image" ||
+                selectedWhisper.DataType === "video") && (
+                <p className="italic text-gray-600 mb-3">
+                  {selectedWhisper.Data}
+                </p>
+              )}
+            <p className="text-sm text-gray-700 mb-1">
+              Emotions: {selectedWhisper.Emotions.join(", ") || "None"}
+            </p>
+            <p className="text-sm text-gray-700">
+              Listens: {selectedWhisper.AmountListens}/
+              {selectedWhisper.MaxListens}
+            </p>
+            <button
+              onClick={() => setSelectedWhisper(null)}
+              className="mt-4 px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded text-gray-800"
+            >
+              Clear Selection
+            </button>
+          </div>
+        ) : (
+          <p className="text-gray-500">Click a marker to view details.</p>
+        )}
+        <button className="p-8 m-12 bg-black text-white">Upload</button>
+    </div>
+  );
+}
+--- END FILE: apps/web/src/components/side-panel.tsx ---
+
 --- START FILE: apps/web/src/lib/utils.ts ---
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
@@ -2044,8 +2465,10 @@ export const config = {
       "name": "whispr",
       "dependencies": {
         "@types/mapbox-gl": "^3.4.1",
+        "fs": "^0.0.1-security",
         "gl-matrix": "^3.4.3",
         "mapbox-gl": "^3.11.1",
+        "minio": "^8.0.5",
         "mongodb": "^6.16.0",
         "react-mapbox-gl": "^5.1.1",
       },
@@ -2427,6 +2850,8 @@ export const config = {
 
     "@vis.gl/react-google-maps": ["@vis.gl/react-google-maps@1.5.2", "", { "dependencies": { "@types/google.maps": "^3.54.10", "fast-deep-equal": "^3.1.3" }, "peerDependencies": { "react": ">=16.8.0 || ^19.0 || ^19.0.0-rc", "react-dom": ">=16.8.0 || ^19.0 || ^19.0.0-rc" } }, "sha512-0Ypmde7M73GgV4TgcaUTNKXsbcXWToPVuawMNrVg7htXmhpEfLARHwhtmP6N1da3od195ZKC8ShXzC6Vm+zYHQ=="],
 
+    "@zxing/text-encoding": ["@zxing/text-encoding@0.9.0", "", {}, "sha512-U/4aVJ2mxI0aDNI8Uq0wEhMgY+u4CNtEb0om3+y3+niDAsoTCOB33UF0sxpzqzdqXLqmvc+vZyAt4O8pPdfkwA=="],
+
     "acorn": ["acorn@8.14.1", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg=="],
 
     "acorn-jsx": ["acorn-jsx@5.3.2", "", { "peerDependencies": { "acorn": "^6.0.0 || ^7.0.0 || ^8.0.0" } }, "sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ=="],
@@ -2473,6 +2898,8 @@ export const config = {
 
     "ast-types-flow": ["ast-types-flow@0.0.8", "", {}, "sha512-OH/2E5Fg20h2aPrbe+QL8JZQFko0YZaF+j4mnQ7BGhfavO7OpSLa8a0y9sBwomHdSbkhTS8TQNayBfnW5DwbvQ=="],
 
+    "async": ["async@3.2.6", "", {}, "sha512-htCUDlxyyCLMgaM3xXg0C0LW2xqfuQ6p05pCEIsXuyQ+a1koYKTuBMzRNwmybfLgvJDMd0r1LTn4+E0Ti6C2AA=="],
+
     "async-function": ["async-function@1.0.0", "", {}, "sha512-hsU18Ae8CDTR6Kgu9DYf0EbCr/a5iGL0rytQDobUcdpYOKokk8LEjVphnXkDkgpi0wYVsqrXuP0bZxJaTqdgoA=="],
 
     "available-typed-arrays": ["available-typed-arrays@1.0.7", "", { "dependencies": { "possible-typed-array-names": "^1.0.0" } }, "sha512-wvUjBtSGN7+7SjNpq/9M2Tg350UZD3q62IFZLbRAR1bSMlCo1ZaeW+BJ+D090e4hIIZLBcTDWe4Mh4jvUDajzQ=="],
@@ -2489,13 +2916,19 @@ export const config = {
 
     "bl": ["bl@4.1.0", "", { "dependencies": { "buffer": "^5.5.0", "inherits": "^2.0.4", "readable-stream": "^3.4.0" } }, "sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w=="],
 
+    "block-stream2": ["block-stream2@2.1.0", "", { "dependencies": { "readable-stream": "^3.4.0" } }, "sha512-suhjmLI57Ewpmq00qaygS8UgEq2ly2PCItenIyhMqVjo4t4pGzqMvfgJuX8iWTeSDdfSSqS6j38fL4ToNL7Pfg=="],
+
     "brace-expansion": ["brace-expansion@1.1.11", "", { "dependencies": { "balanced-match": "^1.0.0", "concat-map": "0.0.1" } }, "sha512-iCuPHDFgrHX7H2vEI/5xpz07zSHB00TpugqhmYtVmMO6518mCuRMoOYFldEBl0g187ufozdaHgWKcYFb61qGiA=="],
 
     "braces": ["braces@3.0.3", "", { "dependencies": { "fill-range": "^7.1.1" } }, "sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA=="],
 
+    "browser-or-node": ["browser-or-node@2.1.1", "", {}, "sha512-8CVjaLJGuSKMVTxJ2DpBl5XnlNDiT4cQFeuCJJrvJmts9YrTZDizTX7PjC2s6W4x+MBGZeEY6dGMrF04/6Hgqg=="],
+
     "bson": ["bson@6.10.3", "", {}, "sha512-MTxGsqgYTwfshYWTRdmZRC+M7FnG1b4y7RO7p2k3X24Wq0yv1m77Wsj0BzlPzd/IowgESfsruQCUToa7vbOpPQ=="],
 
     "buffer": ["buffer@5.7.1", "", { "dependencies": { "base64-js": "^1.3.1", "ieee754": "^1.1.13" } }, "sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ=="],
+
+    "buffer-crc32": ["buffer-crc32@1.0.0", "", {}, "sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w=="],
 
     "busboy": ["busboy@1.6.0", "", { "dependencies": { "streamsearch": "^1.1.0" } }, "sha512-8SFQbg/0hQ9xy3UNTB0YEnsNBbWfhf7RtnzpL7TkBiTBRfrQ9Fxcnz7VJsleJpyp6rVLvXiuORqjlHi5q+PYuA=="],
 
@@ -2572,6 +3005,8 @@ export const config = {
     "data-view-byte-offset": ["data-view-byte-offset@1.0.1", "", { "dependencies": { "call-bound": "^1.0.2", "es-errors": "^1.3.0", "is-data-view": "^1.0.1" } }, "sha512-BS8PfmtDGnrgYdOonGZQdLZslWIeCGFP9tpan0hi1Co2Zr2NKADsvGYA8XxuG/4UWgJ6Cjtv+YJnB6MM69QGlQ=="],
 
     "debug": ["debug@4.4.0", "", { "dependencies": { "ms": "^2.1.3" } }, "sha512-6WTZ/IxCY/T6BALoZHaE4ctp9xm+Z5kY/pzYaCHRFeyVhojxlrm+46y68HA6hr0TcwEssoxNiDEUJQjfPZ/RYA=="],
+
+    "decode-uri-component": ["decode-uri-component@0.2.2", "", {}, "sha512-FqUYQ+8o158GyGTrMFJms9qh3CqTKvAqgqsTnkLI8sKu0028orqBhxNMFkFen0zGyg6epACD32pjVk58ngIErQ=="],
 
     "deep-equal": ["deep-equal@1.0.1", "", {}, "sha512-bHtC0iYvWhyaTzvV3CZgPeZQqCOBGyGsVV7v4eevpdkLHfiSrXUdBG+qAuSz4RI70sszvjQ1QSZ98An1yNwpSw=="],
 
@@ -2671,6 +3106,8 @@ export const config = {
 
     "esutils": ["esutils@2.0.3", "", {}, "sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g=="],
 
+    "eventemitter3": ["eventemitter3@5.0.1", "", {}, "sha512-GWkBvjiSZK87ELrYOSESUYeVIc9mvLLf/nXalMOS5dYrgZq9o5OVkbZAVM06CVxYsCwH9BDZFPlQTlPA1j4ahA=="],
+
     "execa": ["execa@5.1.1", "", { "dependencies": { "cross-spawn": "^7.0.3", "get-stream": "^6.0.0", "human-signals": "^2.1.0", "is-stream": "^2.0.0", "merge-stream": "^2.0.0", "npm-run-path": "^4.0.1", "onetime": "^5.1.2", "signal-exit": "^3.0.3", "strip-final-newline": "^2.0.0" } }, "sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg=="],
 
     "external-editor": ["external-editor@3.1.0", "", { "dependencies": { "chardet": "^0.7.0", "iconv-lite": "^0.4.24", "tmp": "^0.0.33" } }, "sha512-hMQ4CX1p1izmuLYyZqLMO/qGNw10wSv9QDCPfzXfyFrOaCSSoRfqE1Kf1s5an66J5JZC62NewG+mK49jOCtQew=="],
@@ -2683,6 +3120,8 @@ export const config = {
 
     "fast-levenshtein": ["fast-levenshtein@2.0.6", "", {}, "sha512-DCXu6Ifhqcks7TZKY3Hxp3y6qphY5SJZmrWMDrKcERSOXWQdMhU9Ig/PYrzyw/ul9jOIyh0N4M0tbC5hodg8dw=="],
 
+    "fast-xml-parser": ["fast-xml-parser@4.5.3", "", { "dependencies": { "strnum": "^1.1.1" }, "bin": { "fxparser": "src/cli/cli.js" } }, "sha512-RKihhV+SHsIUGXObeVy9AXiBbFwkVk7Syp8XgwN5U3JV416+Gwp/GO9i0JYKmikykgz/UHRrrV4ROuZEo/T0ig=="],
+
     "fastq": ["fastq@1.19.1", "", { "dependencies": { "reusify": "^1.0.4" } }, "sha512-GwLTyxkCXjXbxqIhTsMI2Nui8huMPtnxg7krajPJAjnEG/iiOS7i+zCtWGZR9G0NBKbXKh6X9m9UIsYX/N6vvQ=="],
 
     "fdir": ["fdir@6.4.4", "", { "peerDependencies": { "picomatch": "^3 || ^4" }, "optionalPeers": ["picomatch"] }, "sha512-1NZP+GK4GfuAv3PqKvxQRDMjdSRZjnkq7KfhlNrCNNlZ0ygQFpebfrnfnq/W7fpUnAv9aGWmY1zKx7FYL3gwhg=="],
@@ -2693,6 +3132,8 @@ export const config = {
 
     "fill-range": ["fill-range@7.1.1", "", { "dependencies": { "to-regex-range": "^5.0.1" } }, "sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg=="],
 
+    "filter-obj": ["filter-obj@1.1.0", "", {}, "sha512-8rXg1ZnX7xzy2NGDVkBVaAy+lSlPNwad13BtgSlLuxfIslyt5Vg64U7tFcCt4WS1R0hvtnQybT/IyCkGZ3DpXQ=="],
+
     "find-up": ["find-up@5.0.0", "", { "dependencies": { "locate-path": "^6.0.0", "path-exists": "^4.0.0" } }, "sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng=="],
 
     "flat-cache": ["flat-cache@4.0.1", "", { "dependencies": { "flatted": "^3.2.9", "keyv": "^4.5.4" } }, "sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw=="],
@@ -2700,6 +3141,8 @@ export const config = {
     "flatted": ["flatted@3.3.3", "", {}, "sha512-GX+ysw4PBCz0PzosHDepZGANEuFCMLrnRTiEy9McGjmkCQYwRq4A/X786G/fjM/+OjsWSU1ZrY5qyARZmO/uwg=="],
 
     "for-each": ["for-each@0.3.5", "", { "dependencies": { "is-callable": "^1.2.7" } }, "sha512-dKx12eRCVIzqCxFGplyFKJMPvLEWgmNtUrpTiJIR5u97zEhRG8ySrtboPHZXx7daLxQVrl643cTzbab2tkQjxg=="],
+
+    "fs": ["fs@0.0.1-security", "", {}, "sha512-3XY9e1pP0CVEUCdj5BmfIZxRBTSDycnbqhIOGec9QYtmVH2fbLpj86CFWkrNOkt/Fvty4KZG5lTglL9j/gJ87w=="],
 
     "fs-extra": ["fs-extra@10.1.0", "", { "dependencies": { "graceful-fs": "^4.2.0", "jsonfile": "^6.0.1", "universalify": "^2.0.0" } }, "sha512-oRXApq54ETRj4eMiFzGnHWGy+zo5raudjuxN0b8H7s/RU2oW0Wvsx9O0ACRN/kRq9E8Vu/ReskGB5o3ji+FzHQ=="],
 
@@ -2798,6 +3241,10 @@ export const config = {
     "internal-slot": ["internal-slot@1.1.0", "", { "dependencies": { "es-errors": "^1.3.0", "hasown": "^2.0.2", "side-channel": "^1.1.0" } }, "sha512-4gd7VpWNQNB4UKKCFFVcp1AVv+FMOgs9NKzjHKusc8jTMhd5eL1NqQqOpE0KzMds804/yHlglp3uxgluOqAPLw=="],
 
     "ip-address": ["ip-address@9.0.5", "", { "dependencies": { "jsbn": "1.1.0", "sprintf-js": "^1.1.3" } }, "sha512-zHtQzGojZXTwZTHQqra+ETKd4Sn3vgi7uBmlPoXVWZqYvuKmtI0l/VZTjqGmJY9x88GGOaZ9+G9ES8hC4T4X8g=="],
+
+    "ipaddr.js": ["ipaddr.js@2.2.0", "", {}, "sha512-Ag3wB2o37wslZS19hZqorUnrnzSkpOVy+IiiDEiTqNubEYpYuHWIf6K4psgN2ZWKExS4xhVCrRVfb/wfW8fWJA=="],
+
+    "is-arguments": ["is-arguments@1.2.0", "", { "dependencies": { "call-bound": "^1.0.2", "has-tostringtag": "^1.0.2" } }, "sha512-7bVbi0huj/wrIAOzb8U1aszg9kdi3KN/CyU19CTI7tAoZYEZoL9yCDXpbXN+uPsuWnP02cyug1gleqq+TU+YCA=="],
 
     "is-array-buffer": ["is-array-buffer@3.0.5", "", { "dependencies": { "call-bind": "^1.0.8", "call-bound": "^1.0.3", "get-intrinsic": "^1.2.6" } }, "sha512-DDfANUiiG2wC1qawP66qlTugJeL5HyzMpfr8lLK+jMQirGzNod0B12cFB/9q838Ru27sBwfw78/rdoU7RERz6A=="],
 
@@ -2965,11 +3412,17 @@ export const config = {
 
     "micromatch": ["micromatch@4.0.8", "", { "dependencies": { "braces": "^3.0.3", "picomatch": "^2.3.1" } }, "sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA=="],
 
+    "mime-db": ["mime-db@1.52.0", "", {}, "sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg=="],
+
+    "mime-types": ["mime-types@2.1.35", "", { "dependencies": { "mime-db": "1.52.0" } }, "sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw=="],
+
     "mimic-fn": ["mimic-fn@2.1.0", "", {}, "sha512-OqbOk5oEQeAZ8WXWydlu9HJjz9WVdEIvamMCcXmuqUYjTknH/sqsWvhQ3vgwKFRR1HpjvNBKQ37nbJgYzGqGcg=="],
 
     "minimatch": ["minimatch@3.1.2", "", { "dependencies": { "brace-expansion": "^1.1.7" } }, "sha512-J7p63hRiAjw1NDEww1W7i37+ByIrOWO5XQQAzZ3VOcL0PNybwpfmV/N05zFAzwQ9USyEcX6t3UO+K5aqBQOIHw=="],
 
     "minimist": ["minimist@1.2.8", "", {}, "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA=="],
+
+    "minio": ["minio@8.0.5", "", { "dependencies": { "async": "^3.2.4", "block-stream2": "^2.1.0", "browser-or-node": "^2.1.1", "buffer-crc32": "^1.0.0", "eventemitter3": "^5.0.1", "fast-xml-parser": "^4.4.1", "ipaddr.js": "^2.0.1", "lodash": "^4.17.21", "mime-types": "^2.1.35", "query-string": "^7.1.3", "stream-json": "^1.8.0", "through2": "^4.0.2", "web-encoding": "^1.1.5", "xml2js": "^0.5.0 || ^0.6.2" } }, "sha512-/vAze1uyrK2R/DSkVutE4cjVoAowvIQ18RAwn7HrqnLecLlMazFnY0oNBqfuoAWvu7mZIGX75AzpuV05TJeoHg=="],
 
     "mkdirp": ["mkdirp@0.5.6", "", { "dependencies": { "minimist": "^1.2.6" }, "bin": { "mkdirp": "bin/cmd.js" } }, "sha512-FP+p8RB8OWpF3YZBCrP5gtADmtXApB5AMLn+vdyA+PyxCjrCs00mjyUozssO33cwDeT3wNGdLxJ5M//YqtHAJw=="],
 
@@ -3083,6 +3536,8 @@ export const config = {
 
     "punycode": ["punycode@2.3.1", "", {}, "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg=="],
 
+    "query-string": ["query-string@7.1.3", "", { "dependencies": { "decode-uri-component": "^0.2.2", "filter-obj": "^1.1.0", "split-on-first": "^1.0.0", "strict-uri-encode": "^2.0.0" } }, "sha512-hh2WYhq4fi8+b+/2Kg9CEge4fDPvHS534aOOvOZeQ3+Vf2mCFsaFBYj0i+iXcAq6I9Vzp5fjMFBlONvayDC1qg=="],
+
     "queue-microtask": ["queue-microtask@1.2.3", "", {}, "sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A=="],
 
     "quickselect": ["quickselect@3.0.0", "", {}, "sha512-XdjUArbK4Bm5fLLvlm5KpTFOiOThgfWWI4axAZDWg4E/0mKdZyI9tNEfds27qCi1ze/vwTR16kvmmGhRra3c2g=="],
@@ -3139,6 +3594,8 @@ export const config = {
 
     "safer-buffer": ["safer-buffer@2.1.2", "", {}, "sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg=="],
 
+    "sax": ["sax@1.4.1", "", {}, "sha512-+aWOz7yVScEGoKNd4PA10LZ8sk0A/z5+nXQG5giUO5rprX9jgYsTdov9qCchZiPIZezbZH+jRut8nPodFAX4Jg=="],
+
     "scheduler": ["scheduler@0.26.0", "", {}, "sha512-NlHwttCI/l5gCPR3D1nNXtWABUmBwvZpEQiD4IXSbIDq8BzLIK/7Ir5gTFSGZDUu37K5cMNp0hFtzO38sC7gWA=="],
 
     "semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
@@ -3191,13 +3648,21 @@ export const config = {
 
     "sparse-bitfield": ["sparse-bitfield@3.0.3", "", { "dependencies": { "memory-pager": "^1.0.2" } }, "sha512-kvzhi7vqKTfkh0PZU+2D2PIllw2ymqJKujUcyPMd9Y75Nv4nPbGJZXNhxsgdQab2BmlDct1YnfQCguEvHr7VsQ=="],
 
+    "split-on-first": ["split-on-first@1.1.0", "", {}, "sha512-43ZssAJaMusuKWL8sKUBQXHWOpq8d6CfN/u1p4gUzfJkM05C8rxTmYrkIPTXapZpORA6LkkzcUulJ8FqA7Uudw=="],
+
     "sprintf-js": ["sprintf-js@1.1.3", "", {}, "sha512-Oo+0REFV59/rz3gfJNKQiBlwfHaSESl1pcGyABQsnnIfWOFt6JNj5gCog2U6MLZ//IGYD+nA8nI+mTShREReaA=="],
 
     "stable-hash": ["stable-hash@0.0.5", "", {}, "sha512-+L3ccpzibovGXFK+Ap/f8LOS0ahMrHTf3xu7mMLSpEGU0EO9ucaysSylKo9eRDFNhWve/y275iPmIZ4z39a9iA=="],
 
     "std-env": ["std-env@3.9.0", "", {}, "sha512-UGvjygr6F6tpH7o2qyqR6QYpwraIjKSdtzyBdyytFOHmPZY917kwdwLG0RbOjWOnKmnm3PeHjaoLLMie7kPLQw=="],
 
+    "stream-chain": ["stream-chain@2.2.5", "", {}, "sha512-1TJmBx6aSWqZ4tx7aTpBDXK0/e2hhcNSTV8+CbFJtDjbb+I1mZ8lHit0Grw9GRT+6JbIrrDd8esncgBi8aBXGA=="],
+
+    "stream-json": ["stream-json@1.9.1", "", { "dependencies": { "stream-chain": "^2.2.5" } }, "sha512-uWkjJ+2Nt/LO9Z/JyKZbMusL8Dkh97uUBTv3AJQ74y07lVahLY4eEFsPsE97pxYBwr8nnjMAIch5eqI0gPShyw=="],
+
     "streamsearch": ["streamsearch@1.1.0", "", {}, "sha512-Mcc5wHehp9aXz1ax6bZUyY5afg9u2rv5cqQI3mRrYkGC8rW2hM02jWuwjtL++LS5qinSyhj2QfLyNsuc+VsExg=="],
+
+    "strict-uri-encode": ["strict-uri-encode@2.0.0", "", {}, "sha512-QwiXZgpRcKkhTj2Scnn++4PKtWsH0kpzZ62L2R6c/LUVYv7hVnZqcg2+sMuT6R7Jusu1vviK/MFsu6kNJfWlEQ=="],
 
     "string-width": ["string-width@4.2.3", "", { "dependencies": { "emoji-regex": "^8.0.0", "is-fullwidth-code-point": "^3.0.0", "strip-ansi": "^6.0.1" } }, "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g=="],
 
@@ -3223,6 +3688,8 @@ export const config = {
 
     "strip-json-comments": ["strip-json-comments@3.1.1", "", {}, "sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig=="],
 
+    "strnum": ["strnum@1.1.2", "", {}, "sha512-vrN+B7DBIoTTZjnPNewwhx6cBA/H+IS7rfW68n7XxC1y7uoiGQBxaKzqucGUgavX15dJgiGztLJ8vxuEzwqBdA=="],
+
     "styled-jsx": ["styled-jsx@5.1.6", "", { "dependencies": { "client-only": "0.0.1" }, "peerDependencies": { "react": ">= 16.8.0 || 17.x.x || ^18.0.0-0 || ^19.0.0-0" } }, "sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA=="],
 
     "supercluster": ["supercluster@8.0.1", "", { "dependencies": { "kdbush": "^4.0.2" } }, "sha512-IiOea5kJ9iqzD2t7QJq/cREyLHTtSmUT6gQsweojg9WH2sYJqZK9SswTu6jrscO6D1G5v5vYZ9ru/eq85lXeZQ=="],
@@ -3242,6 +3709,8 @@ export const config = {
     "tapable": ["tapable@2.2.1", "", {}, "sha512-GNzQvQTOIP6RyTfE2Qxb8ZVlNmw0n88vp1szwWRimP02mnTsx3Wtn5qRdqY9w2XduFNUgvOwhNnQsjwCp+kqaQ=="],
 
     "through": ["through@2.3.8", "", {}, "sha512-w89qg7PI8wAdvX60bMDP+bFoD5Dvhm9oLheFp5O4a2QF0cSBGsBX4qZmadPMvVqlLJBBci+WqGGOAPvcDeNSVg=="],
+
+    "through2": ["through2@4.0.2", "", { "dependencies": { "readable-stream": "3" } }, "sha512-iOqSav00cVxEEICeD7TjLB1sueEL+81Wpzp2bY17uZjZN0pWZPuo4suZ/61VujxmqSGFfgOcNuTZ85QJwNZQpw=="],
 
     "tinycolor2": ["tinycolor2@1.6.0", "", {}, "sha512-XPaBkWQJdsf3pLKJV9p4qN/S+fm2Oj8AIPo1BTUhg5oxkvm9+SVEGFdhyOz7tTdUTfvxMiAs4sp6/eZO2Ew+pw=="],
 
@@ -3319,6 +3788,8 @@ export const config = {
 
     "use-sync-external-store": ["use-sync-external-store@1.5.0", "", { "peerDependencies": { "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-Rb46I4cGGVBmjamjphe8L/UnvJD+uPPtTkNvX5mZgqdbavhI4EbgIWJiIHXJ8bc/i9EQGPRh4DwEURJ552Do0A=="],
 
+    "util": ["util@0.12.5", "", { "dependencies": { "inherits": "^2.0.3", "is-arguments": "^1.0.4", "is-generator-function": "^1.0.7", "is-typed-array": "^1.1.3", "which-typed-array": "^1.1.2" } }, "sha512-kZf/K6hEIrWHI6XqOFUiiMa+79wE/D8Q+NCNAWclkyg3b4d2k7s0QGepNjiABc+aR3N1PAyHL7p6UcLY6LmrnA=="],
+
     "util-deprecate": ["util-deprecate@1.0.2", "", {}, "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw=="],
 
     "v8-compile-cache-lib": ["v8-compile-cache-lib@3.0.1", "", {}, "sha512-wa7YjyUGfNZngI/vtK0UHAN+lgDCxBPCylVXGp0zu59Fz5aiGtNXaq3DhIov063MorB+VfufLh3JlF2KdTK3xg=="],
@@ -3330,6 +3801,8 @@ export const config = {
     "wcwidth": ["wcwidth@1.0.1", "", { "dependencies": { "defaults": "^1.0.3" } }, "sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg=="],
 
     "web": ["web@workspace:apps/web"],
+
+    "web-encoding": ["web-encoding@1.1.5", "", { "dependencies": { "util": "^0.12.3" }, "optionalDependencies": { "@zxing/text-encoding": "0.9.0" } }, "sha512-HYLeVCdJ0+lBYV2FvNZmv3HJ2Nt0QYXqZojk3d9FJOLkwnuhzM9tmamh8d7HPM8QqjKH8DeHkFTx+CFlWpZZDA=="],
 
     "webidl-conversions": ["webidl-conversions@7.0.0", "", {}, "sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g=="],
 
@@ -3352,6 +3825,10 @@ export const config = {
     "wrap-ansi": ["wrap-ansi@6.2.0", "", { "dependencies": { "ansi-styles": "^4.0.0", "string-width": "^4.1.0", "strip-ansi": "^6.0.0" } }, "sha512-r6lPcBGxZXlIcymEu7InxDMhdW0KDxpLgoFLcguasxCaJ/SOIZwINatK9KY/tf+ZrlywOKU0UDj3ATXUBfxJXA=="],
 
     "wrappy": ["wrappy@1.0.2", "", {}, "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ=="],
+
+    "xml2js": ["xml2js@0.6.2", "", { "dependencies": { "sax": ">=0.6.0", "xmlbuilder": "~11.0.0" } }, "sha512-T4rieHaC1EXcES0Kxxj4JWgaUQHDk+qwHcYOCFHfiwKz7tOVPLq7Hjq9dM1WCMhylqMEfP7hMcOIChvotiZegA=="],
+
+    "xmlbuilder": ["xmlbuilder@11.0.1", "", {}, "sha512-fDlsI/kFEx7gLvbecc0/ohLG50fugQp8ryHzMTuW9vSa1GJ0XYWKnhsUx7oie3G98+r56aTQIUB4kht42R3JvA=="],
 
     "yn": ["yn@3.1.1", "", {}, "sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q=="],
 
@@ -3509,8 +3986,10 @@ export const config = {
   ],
   "dependencies": {
     "@types/mapbox-gl": "^3.4.1",
+    "fs": "^0.0.1-security",
     "gl-matrix": "^3.4.3",
     "mapbox-gl": "^3.11.1",
+    "minio": "^8.0.5",
     "mongodb": "^6.16.0",
     "react-mapbox-gl": "^5.1.1"
   }

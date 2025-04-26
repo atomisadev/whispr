@@ -1,28 +1,18 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
-import dynamic from "next/dynamic";
+// apps/web/src/app/dashboard/page.tsx
+import { auth } from "@clerk/nextjs/server";
+import DashboardMapLoader from "@/components/dashboard-map-loader"; // Import the new client component loader
 
-const DynamicMapComponent = dynamic(
-  () => import("@/components/mapbox").then((mod) => mod.MapComponent),
-  {
-    loading: () => (
-      <div className="flex items-center justify-center h-full">
-        Loading map...
-      </div>
-    ),
-  }
-);
+// No need for dynamic or APIProvider imports here anymore
 
 export default async function DashboardPage() {
-  const { userId } = await auth();
+  const { userId } = await auth(); // Server-side auth check
 
   if (!userId) {
+    // Handle redirect or null render if user is not authenticated
+    // For example: redirect('/sign-in');
     return null;
   }
 
-  return (
-    <div className="h-full w-full">
-      {" "}
-      <DynamicMapComponent />
-    </div>
-  );
+  // The page now simply renders the client component which handles the map
+  return <DashboardMapLoader />;
 }

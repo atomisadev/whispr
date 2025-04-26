@@ -44,6 +44,8 @@ Exported File Structure:
 │       │   │   ├── layout.tsx
 │       │   │   └── page.tsx
 │       │   ├── components
+│       │   │   ├── dashboard-map-loader.tsx
+│       │   │   ├── google-maps.tsx
 │       │   │   └── mapbox.tsx
 │       │   ├── lib
 │       │   │   └── utils.ts
@@ -595,6 +597,7 @@ export default nextConfig;
   },
   "dependencies": {
     "@clerk/nextjs": "^6.18.0",
+    "@vis.gl/react-google-maps": "^1.5.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.503.0",
@@ -691,33 +694,23 @@ export default function DashboardLayout({
 --- END FILE: apps/web/src/app/dashboard/layout.tsx ---
 
 --- START FILE: apps/web/src/app/dashboard/page.tsx ---
-import { auth, currentUser } from "@clerk/nextjs/server";
-import dynamic from "next/dynamic";
+// apps/web/src/app/dashboard/page.tsx
+import { auth } from "@clerk/nextjs/server";
+import DashboardMapLoader from "@/components/dashboard-map-loader"; // Import the new client component loader
 
-const DynamicMapComponent = dynamic(
-  () => import("@/components/mapbox").then((mod) => mod.MapComponent),
-  {
-    loading: () => (
-      <div className="flex items-center justify-center h-full">
-        Loading map...
-      </div>
-    ),
-  }
-);
+// No need for dynamic or APIProvider imports here anymore
 
 export default async function DashboardPage() {
-  const { userId } = await auth();
+  const { userId } = await auth(); // Server-side auth check
 
   if (!userId) {
+    // Handle redirect or null render if user is not authenticated
+    // For example: redirect('/sign-in');
     return null;
   }
 
-  return (
-    <div className="h-full w-full">
-      {" "}
-      <DynamicMapComponent />
-    </div>
-  );
+  // The page now simply renders the client component which handles the map
+  return <DashboardMapLoader />;
 }
 
 --- END FILE: apps/web/src/app/dashboard/page.tsx ---
@@ -1001,53 +994,541 @@ export default async function Home() {
 
 --- END FILE: apps/web/src/app/page.tsx ---
 
---- START FILE: apps/web/src/components/mapbox.tsx ---
-// apps/web/src/components/mapbox.tsx
-"use client";
+--- START FILE: apps/web/src/components/dashboard-map-loader.tsx ---
+// apps/web/src/components/dashboard-map-loader.tsx
+"use client"; // <--- Mark this as a Client Component
 
-import React, { useEffect, useRef } from "react";
-import mapboxgl, { Map as MapboxMap } from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import React from "react";
+import dynamic from "next/dynamic";
+import { APIProvider } from "@vis.gl/react-google-maps";
 
-export function MapComponent() {
-  const mapContainer = useRef<HTMLDivElement | null>(null);
-  const map = useRef<MapboxMap | null>(null);
-  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+// Define the dynamic import *inside* the client component
+const DynamicMapComponent = dynamic(
+  // Adjust the path if google-map.tsx is elsewhere
+  () => import("./google-maps").then((mod) => mod.GoogleMapComponent),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        Loading map...
+      </div>
+    ),
+    ssr: false, // This is now allowed because we are in a Client Component
+  }
+);
 
-  useEffect(() => {
-    if (!mapboxToken) {
-      console.error("Mapbox Token is missing inside useEffect.");
-      return;
-    }
+export default function DashboardMapLoader() {
+  // Read the public env var directly in the client component
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_MAPS_API_KEY;
 
-    mapboxgl.accessToken = mapboxToken;
-
-    if (map.current || !mapContainer.current) return;
-
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/standard",
-      center: [-74.5, 40.5],
-      zoom: 10,
-    });
-
-    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
-
-    return () => {
-      map.current?.remove();
-      map.current = null;
-    };
-  }, [mapboxToken]);
-
-  if (!mapboxToken) {
+  if (!googleMapsApiKey) {
     return (
-      <div className="flex items-center justify-center h-full text-red-500">
-        Mapbox Token is missing. Configure NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN.
+      <div className="flex items-center justify-center h-full text-red-500 p-4">
+        Error: Google Maps API Key is missing. Configure
+        NEXT_PUBLIC_Maps_API_KEY.
       </div>
     );
   }
 
-  return <div ref={mapContainer} className="h-full w-full" />;
+  return (
+    // APIProvider wraps the actual map usage
+    <APIProvider apiKey={googleMapsApiKey}>
+      <div className="h-full w-full">
+        <DynamicMapComponent />
+      </div>
+    </APIProvider>
+  );
+}
+
+--- END FILE: apps/web/src/components/dashboard-map-loader.tsx ---
+
+--- START FILE: apps/web/src/components/google-maps.tsx ---
+// apps/web/src/components/google-map.tsx
+"use client";
+
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  Map,
+  AdvancedMarker,
+  Pin,
+  InfoWindow,
+} from "@vis.gl/react-google-maps";
+
+// Define the structure of a Whisper (same as before)
+interface Whisper {
+  Location: string; // "latitude,longitude"
+  Data: string;
+  DataType: string;
+  MaxListens: number;
+  AmountListens: number;
+  Emotions: string[];
+  _id: string;
+}
+
+// Define the structure for the backend API response (same as before)
+interface WhisperApiResponse {
+  status: number;
+  message: string;
+  data?: {
+    data: Whisper[];
+  };
+}
+
+interface LatLngLiteral {
+  lat: number;
+  lng: number;
+}
+
+const DEFAULT_CENTER: LatLngLiteral = { lat: 40.5, lng: -74.5 }; // Default: somewhere in NJ
+const DEFAULT_ZOOM = 10;
+// Backend expects radius in the same "units" as the coordinate difference calculation.
+// Since the backend calculation is flawed (treats degrees as Cartesian),
+// this radius value might need significant tuning based on observed behavior.
+// A more robust backend would use proper geospatial queries (e.g., meters/km).
+const BACKEND_RADIUS_UNITS = 5 * 100; // Arbitrary scaling factor for the flawed backend calculation. TUNE THIS!
+
+// --- !!! IMPORTANT BACKEND NOTE !!! ---
+// The current backend calculation in GetWhispers treats latitude/longitude degrees
+// as if they were points on a flat Cartesian plane (Euclidean distance).
+// This is inaccurate for calculating real-world distances on a sphere.
+// For accurate results, the backend should use:
+// 1. MongoDB's geospatial queries ($nearSphere with a 2dsphere index).
+// 2. Haversine formula or similar geodetic calculations if not using DB queries.
+// The `BACKEND_RADIUS_UNITS` constant above is a crude attempt to map KM to
+// the backend's flawed unit system and WILL require tuning.
+// -------------------------------------
+
+// Helper function to parse location string
+const parseLocation = (locationString: string): LatLngLiteral | null => {
+  try {
+    const [latStr, lngStr] = locationString.split(",");
+    const lat = parseFloat(latStr);
+    const lng = parseFloat(lngStr);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
+  } catch (e) {
+    console.error(`Error parsing location string: ${locationString}`, e);
+  }
+  return null;
+};
+
+export function GoogleMapComponent() {
+  const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
+  const [mapCenter, setMapCenter] = useState<LatLngLiteral>(DEFAULT_CENTER);
+  const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
+  const [whispers, setWhispers] = useState<Whisper[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [openInfoWindowMarkerId, setOpenInfoWindowMarkerId] = useState<
+    string | null
+  >(null);
+
+  // Function to fetch whispers (mostly unchanged, uses userLocation state)
+  const fetchWhispers = useCallback(async (lat: number, lng: number) => {
+    setIsLoading(true);
+    setError(null);
+    setWhispers([]); // Clear previous whispers
+
+    // --- Adjust Backend URL if necessary ---
+    // const backendUrl = `/api/whispers`; // Use relative path assumes proxy/same-origin
+    const backendUrl = `http://localhost:8080/whispers`; // Or use absolute path
+    // ---------------------------------------
+
+    const apiUrl = `${backendUrl}?location="${lat},${lng}"&radius="${BACKEND_RADIUS_UNITS}"`;
+    console.log(`Workspaceing whispers from: ${apiUrl}`);
+
+    try {
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const result: WhisperApiResponse = await response.json();
+      console.log("API Response:", result);
+
+      if (result.status >= 200 && result.status < 300 && result.data?.data) {
+        setWhispers(result.data.data);
+      } else {
+        if (result.status >= 200 && result.status < 300) {
+          console.log(
+            "API returned success but no whispers found in the response data."
+          );
+          setWhispers([]);
+        } else {
+          throw new Error(result.message || "Failed to fetch whispers");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch whispers:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An unknown error occurred fetching whispers"
+      );
+      setWhispers([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []); // No dependencies needed here as it reads state directly when called
+
+  // Effect 1: Get User's Initial Location
+    useEffect(() => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const currentLocation = { lat: latitude, lng: longitude };
+            console.log(
+              `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
+            );
+            setUserLocation(currentLocation);
+            setMapCenter(currentLocation); // Center map on user
+            setMapZoom(14); // Zoom in closer
+          },
+          (err) => {
+            console.warn(`Geolocation Error (${err.code}): ${err.message}`);
+            setError("Unable to retrieve location. Showing default area.");
+            // Keep default center if geolocation fails
+          },
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+      } else {
+        setError("Geolocation is not supported by this browser.");
+      }
+    }, []); // Run only once on mount
+
+  // Effect 2: Fetch whispers when user location is known
+  useEffect(() => {
+    if (userLocation) {
+      fetchWhispers(userLocation.lat, userLocation.lng);
+    }
+  }, [userLocation, fetchWhispers]); // Re-fetch when location changes
+
+  // Find the currently selected whisper for the InfoWindow
+  const selectedWhisper = whispers.find(
+    (w) => w._id === openInfoWindowMarkerId
+  );
+  const selectedWhisperLocation = selectedWhisper
+    ? parseLocation(selectedWhisper.Location)
+    : null;
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full text-red-500 p-4">
+        Error: {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-full w-full">
+      <Map
+        mapId={"YOUR_MAP_ID"} // Optional: Create Map ID in Google Cloud Console for custom styles
+        center={mapCenter}
+        zoom={mapZoom}
+        gestureHandling={"greedy"} // Allows map interaction without holding ctrl/cmd
+        disableDefaultUI={false} // Show default controls like zoom, fullscreen
+        className="absolute top-0 bottom-0 w-full h-full"
+      >
+        {/* Render user's location marker if available */}
+        {userLocation && (
+          <AdvancedMarker position={userLocation} title={"Your Location"}>
+            {/* You can customize the user marker, e.g., different color Pin */}
+            <span style={{ fontSize: "2rem" }}>📍</span>
+          </AdvancedMarker>
+        )}
+
+        {/* Render whisper markers */}
+        {whispers.map((whisper) => {
+          const position = parseLocation(whisper.Location);
+          if (!position) return null; // Skip if location is invalid
+
+          return (
+            <AdvancedMarker
+              key={whisper._id}
+              position={position}
+              onClick={() => setOpenInfoWindowMarkerId(whisper._id)}
+              title={`Whisper: ${whisper.Data.substring(0, 30)}...`} // Tooltip on hover
+            >
+              {/* Default Pin, can be customized */}
+              <Pin />
+            </AdvancedMarker>
+          );
+        })}
+
+        {/* Render InfoWindow for the selected marker */}
+        {selectedWhisper && selectedWhisperLocation && (
+          <InfoWindow
+            position={selectedWhisperLocation}
+            pixelOffset={[0, -40]} // Adjust offset to position above marker pin
+            onCloseClick={() => setOpenInfoWindowMarkerId(null)}
+          >
+            <div style={{ maxWidth: "200px" }}>
+              <h3>Whisper</h3>
+              <p>{selectedWhisper.Data}</p>
+              <small>Emotions: {selectedWhisper.Emotions.join(", ")}</small>
+            </div>
+          </InfoWindow>
+        )}
+      </Map>
+      {isLoading && (
+        <div className="absolute top-2 left-2 bg-white bg-opacity-80 p-2 rounded shadow z-10">
+          Loading whispers...
+        </div>
+      )}
+    </div>
+  );
+}
+
+--- END FILE: apps/web/src/components/google-maps.tsx ---
+
+--- START FILE: apps/web/src/components/mapbox.tsx ---
+// apps/web/src/components/mapbox.tsx
+"use client";
+
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import mapboxgl, { Map as MapboxMap, Marker } from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
+
+interface Whisper {
+  Location: string;
+  Data: string;
+  DataType: string;
+  MaxListens: number;
+  AmountListens: number;
+  Emotions: string[];
+  _id: string;
+}
+
+interface WhisperApiResponse {
+  status: number;
+  message: string;
+  data?: {
+    data: Whisper[];
+  };
+}
+
+const DEFAULT_CENTER: [number, number] = [-74.5, 40];
+const DEFAULT_ZOOM = 10;
+const SEARCH_RADIUS_KM = 5;
+const BACKEND_RADIUS_UNITS = SEARCH_RADIUS_KM * 100;
+
+export function MapComponent() {
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const map = useRef<MapboxMap | null>(null);
+  const markersRef = useRef<Marker[]>([]);
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [whispers, setWhispers] = useState<Whisper[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Function to clear existing markers
+  const clearMarkers = useCallback(() => {
+    markersRef.current.forEach((marker) => marker.remove());
+    markersRef.current = [];
+  }, []);
+
+  // Function to fetch whispers from the backend
+  const fetchWhispers = useCallback(
+    async (lat: number, lng: number) => {
+      setIsLoading(true);
+      setError(null);
+      clearMarkers(); // Clear previous markers before fetching new ones
+
+      // --- Adjust Backend URL if necessary ---
+      // If your backend runs on a different port (e.g., 8080) and isn't proxied:
+      // const backendUrl = `http://localhost:8080/whispers`;
+      // Otherwise, use a relative path if proxied or same-origin:
+      const backendUrl = `/api/whispers`; // Adjust if you have a different API prefix
+      // ---------------------------------------
+
+      const apiUrl = `${backendUrl}?location=${lat},${lng}&radius=${BACKEND_RADIUS_UNITS}`;
+
+      console.log(`Workspaceing whispers from: ${apiUrl}`); // Debug log
+
+      try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const result: WhisperApiResponse = await response.json();
+
+        console.log("API Response:", result); // Debug log
+
+        if (result.status >= 200 && result.status < 300 && result.data?.data) {
+          setWhispers(result.data.data);
+        } else {
+          // Handle cases where the API returns success status but no data field or empty data
+          if (result.status >= 200 && result.status < 300) {
+            console.log(
+              "API returned success but no whispers found in the response data."
+            );
+            setWhispers([]); // Set to empty array if data field is missing or empty
+          } else {
+            throw new Error(result.message || "Failed to fetch whispers");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch whispers:", err);
+        setError(
+          err instanceof Error ? err.message : "An unknown error occurred"
+        );
+        setWhispers([]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearMarkers]
+  );
+
+  useEffect(() => {
+    if (!mapboxToken) {
+      console.error("Mapbox Token is missing inside useEffect.");
+      setError(
+        "Mapbox Token is missing. Configure NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN."
+      );
+      return;
+    }
+
+    if (map.current || !mapContainer.current) return;
+
+    mapboxgl.accessToken = mapboxToken;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/standard",
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+    });
+
+    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+
+    const geolocate = new mapboxgl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true,
+      },
+      trackUserLocation: true,
+      showUserHeading: true,
+    });
+    map.current.addControl(geolocate);
+
+    geolocate.on("geolocate", (e: any) => {
+      const { latitude, longitude } = e.coords;
+      console.log(`Geolocate event: Lat: ${latitude}, Lng: ${longitude}`);
+      setUserLocation({ lat: latitude, lng: longitude });
+    });
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log(
+            `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
+          );
+          setUserLocation({ lat: latitude, lng: longitude });
+          map.current?.flyTo({ center: [longitude, latitude], zoom: 14 });
+        },
+        (err) => {
+          console.warn(`Geolocation Error (${err.code}): ${err.message}`);
+          setError("Unable to retrieve location. Showing default area.");
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    } else {
+      setError("Geolocation is not supported by this browser.");
+    }
+
+    // Cleanup map instance on component unmount
+    return () => {
+      clearMarkers();
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [mapboxToken, clearMarkers]); // mapboxToken should only change if env changes, clearMarkers is stable
+
+  // Effect 2: Fetch whispers when user location changes
+  useEffect(() => {
+    if (userLocation) {
+      fetchWhispers(userLocation.lat, userLocation.lng);
+    }
+  }, [userLocation, fetchWhispers]); // Re-fetch when location changes
+
+  // Effect 3: Render markers when whispers data changes or map is ready
+  useEffect(() => {
+    if (!map.current || !whispers || whispers.length === 0) {
+      clearMarkers(); // Ensure markers are cleared if no whispers
+      return;
+    }
+
+    console.log(`Rendering ${whispers.length} whisper markers.`); // Debug log
+    clearMarkers(); // Clear old markers before adding new ones
+
+    whispers.forEach((whisper) => {
+      try {
+        const [latStr, lngStr] = whisper.Location.split(",");
+        const lat = parseFloat(latStr);
+        const lng = parseFloat(lngStr);
+
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const marker = new mapboxgl.Marker()
+            .setLngLat([lng, lat]) // Mapbox uses [longitude, latitude]
+            .setPopup(
+              new mapboxgl.Popup().setHTML(
+                `<h3>Whisper</h3><p>${whisper.Data.substring(0, 50)}...</p>`
+              )
+            ) // Optional: Add popup
+            .addTo(map.current!);
+
+          markersRef.current.push(marker);
+        } else {
+          console.warn(
+            `Invalid location format for whisper ${whisper._id}: ${whisper.Location}`
+          );
+        }
+      } catch (e) {
+        console.error(
+          `Error processing whisper location ${whisper._id}: ${whisper.Location}`,
+          e
+        );
+      }
+    });
+  }, [whispers, map.current, clearMarkers]); // Re-render markers when whispers or map change
+
+  // Render Logic
+  if (!mapboxToken && !error) {
+    // Initial state before token check effect runs
+    return (
+      <div className="flex items-center justify-center h-full">
+        Checking Mapbox token...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full text-red-500 p-4">
+        Error: {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-full w-full">
+      <div
+        ref={mapContainer}
+        className="absolute top-0 bottom-0 w-full h-full"
+      />
+      {isLoading && (
+        <div className="absolute top-2 left-2 bg-white bg-opacity-80 p-2 rounded shadow z-10">
+          Loading whispers...
+        </div>
+      )}
+    </div>
+  );
 }
 
 --- END FILE: apps/web/src/components/mapbox.tsx ---
@@ -1142,6 +1623,7 @@ export const config = {
       "version": "0.1.0",
       "dependencies": {
         "@clerk/nextjs": "^6.18.0",
+        "@vis.gl/react-google-maps": "^1.5.2",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lucide-react": "^0.503.0",
@@ -1418,6 +1900,8 @@ export const config = {
 
     "@types/glob": ["@types/glob@7.2.0", "", { "dependencies": { "@types/minimatch": "*", "@types/node": "*" } }, "sha512-ZUxbzKl0IfJILTS6t7ip5fQQM/J3TJYubDm3nMbgubNNYS62eXeUpoLUC8/7fJNiFYHTrGPQn7hspDUzIHX3UA=="],
 
+    "@types/google.maps": ["@types/google.maps@3.58.1", "", {}, "sha512-X9QTSvGJ0nCfMzYOnaVs/k6/4L+7F5uCS+4iUmkLEls6J9S/Phv+m/i3mDeyc49ZBgwab3EFO1HEoBY7k98EGQ=="],
+
     "@types/inquirer": ["@types/inquirer@6.5.0", "", { "dependencies": { "@types/through": "*", "rxjs": "^6.4.0" } }, "sha512-rjaYQ9b9y/VFGOpqBEXRavc3jh0a+e6evAbI31tMda8VlPaSy0AZJfXsvmIe3wklc7W6C3zCSfleuMXR7NOyXw=="],
 
     "@types/json-schema": ["@types/json-schema@7.0.15", "", {}, "sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA=="],
@@ -1499,6 +1983,8 @@ export const config = {
     "@unrs/resolver-binding-win32-ia32-msvc": ["@unrs/resolver-binding-win32-ia32-msvc@1.7.1", "", { "os": "win32", "cpu": "ia32" }, "sha512-d6Cy8VqTGT/ehavIek6XNi7ZVpKhyG0CXgYBPNNdZWI+7huy3KfQM2ME5pEKudkOLjtzEsbwWnNdCswpn6s/tg=="],
 
     "@unrs/resolver-binding-win32-x64-msvc": ["@unrs/resolver-binding-win32-x64-msvc@1.7.1", "", { "os": "win32", "cpu": "x64" }, "sha512-isaSSX0p2m4Fe9gjJZi+ga6yeRhej237QiC0vQVawsA1Xmr3updYoEEpB4F0LNVjmLUiLqxfmh8f68eGThYqtg=="],
+
+    "@vis.gl/react-google-maps": ["@vis.gl/react-google-maps@1.5.2", "", { "dependencies": { "@types/google.maps": "^3.54.10", "fast-deep-equal": "^3.1.3" }, "peerDependencies": { "react": ">=16.8.0 || ^19.0 || ^19.0.0-rc", "react-dom": ">=16.8.0 || ^19.0 || ^19.0.0-rc" } }, "sha512-0Ypmde7M73GgV4TgcaUTNKXsbcXWToPVuawMNrVg7htXmhpEfLARHwhtmP6N1da3od195ZKC8ShXzC6Vm+zYHQ=="],
 
     "acorn": ["acorn@8.14.1", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg=="],
 

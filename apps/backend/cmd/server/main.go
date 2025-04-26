@@ -20,8 +20,6 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	e.GET("/location/:id", getWhispr)
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

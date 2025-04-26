@@ -6,50 +6,7 @@ import {
   AdvancedMarker,
 } from "@vis.gl/react-google-maps";
 
-You are absolutely correct! In TypeScript, the options prop for the <Map> component from @vis.gl/react-google-maps expects a specific type definition. If you're directly assigning a plain JavaScript object to it, TypeScript will likely complain about a type mismatch.
-
-To make the options prop work correctly in your TypeScript code, you need to ensure that the object you're passing conforms to the google.maps.MapOptions interface provided by the Google Maps JavaScript API's type definitions.
-
-Here's how you can correctly apply the options prop with your dark mode style in TypeScript:
-TypeScript
-
-"use client";
-
-import React, { useEffect, useState, useCallback } from "react";
-import {
-  Map,
-  AdvancedMarker,
-} from "@vis.gl/react-google-maps";
-import type { GoogleMapsContextProps } from "@vis.gl/react-google-maps"; // Import the context props type
-
-interface Whisper {
-  Location: string;
-  DataType: string;
-  Data: string;
-  MaxListens: number;
-  AmountListens: number;
-  Emotions: string[];
-  _id: string;
-  MediaUrl?: string;
-}
-
-interface WhisperApiResponse {
-  status: number;
-  message: string;
-  data?: {
-    data: Whisper[];
-  };
-}
-
-interface LatLngLiteral {
-  lat: number;
-  lng: number;
-}
-
-const DEFAULT_CENTER: LatLngLiteral = { lat: 51, lng: 49 };
-const DEFAULT_ZOOM = 8;
-
-const darkModeStyle: google.maps.MapStyle[] = [ // Explicitly type the style array
+const darkModeStyle = [
   { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
@@ -129,6 +86,7 @@ const darkModeStyle: google.maps.MapStyle[] = [ // Explicitly type the style arr
     stylers: [{ color: "#17263c" }],
   },
 ];
+
 interface Whisper {
   Location: string;
   DataType: string;
@@ -291,10 +249,6 @@ export function GoogleMapComponent() {
     );
   }
 
-  const mapOptions: google.maps.MapOptions = {
-    styles: darkModeStyle, // Directly apply the dark mode style
-  };
-
   return (
     <div className="grid grid-cols-3 grid-row-1 h-full gap-4">
       {/* Google Map Section */}
@@ -307,7 +261,6 @@ export function GoogleMapComponent() {
           gestureHandling={"greedy"}
           disableDefaultUI={false}
           className={"h-full"}
-          options={mapOptions}
         >
           {userLocation && (
             <AdvancedMarker position={userLocation} title={"Your Location"}>

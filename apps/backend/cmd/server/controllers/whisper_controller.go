@@ -233,9 +233,6 @@ func GetWhispers(c echo.Context) error {
 			log.Printf("Error decoding whisper: %v", err)
 			continue
 		}
-/*
-		userLat, _ := strconv.Atoi(realLocation[0])
-		userLong, _ := strconv.Atoi(realLocation[1])
 
 		whisperLocParts := strings.Split(singleWhisper.Location, ",")
 		if len(whisperLocParts) != 2 {
@@ -270,5 +267,4 @@ func GetWhispers(c echo.Context) error {
 		Message: "success",
 		Data:    &echo.Map{"data": nearbyWhispers},
 	})
-		*/
 }

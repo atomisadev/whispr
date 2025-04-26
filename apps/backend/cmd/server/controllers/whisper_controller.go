@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -210,27 +209,24 @@ func GetWhisper(c echo.Context) error {
 }
 
 func GetWhispers(c echo.Context) error {
-	radiusStr := c.QueryParam("radius")
-	location := c.QueryParam("location") // Location param is still needed for filtering
+	// radiusStr := c.QueryParam("radius")
+	// location := c.QueryParam("location")
 
-	// --- Parameter Validation (Keep this part) ---
-	radius, err := strconv.ParseFloat(radiusStr, 64)
-	if err != nil || radius <= 0 {
-		log.Printf("Invalid or missing radius '%s', defaulting to 5000 units", radiusStr)
-		radius = 5000
-	}
+	// radius, err := strconv.ParseFloat(radiusStr, 64)
+	// if err != nil || radius <= 0 {
+	// 	log.Printf("Invalid or missing radius '%s', defaulting to 5000 units", radiusStr)
+	// 	radius = 5000
+	// }
 
-	locParts := strings.Split(location, ",")
+	/*locParts := strings.Split(location, ",")
 	if len(locParts) != 2 {
-		// Still require location *for filtering* on this endpoint
-		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Location query parameter is required for filtering. Expected 'latitude,longitude'"}})
-	}
-	userLat, errLat := strconv.ParseFloat(strings.TrimSpace(locParts[0]), 64)
-	userLng, errLng := strconv.ParseFloat(strings.TrimSpace(locParts[1]), 64)
-	if errLat != nil || errLng != nil {
-		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Invalid latitude or longitude values in query parameter"}})
-	}
-	// --- End Parameter Validation ---
+		return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Invalid location format. Expected 'latitude,longitude'"}})
+	}*/
+	// userLat, errLat := strconv.ParseFloat(strings.TrimSpace(locParts[0]), 64)
+	// userLng, errLng := strconv.ParseFloat(strings.TrimSpace(locParts[1]), 64)
+	// if errLat != nil || errLng != nil {
+	// 	return c.JSON(http.StatusBadRequest, responses.WhisperResponse{Status: http.StatusBadRequest, Message: "error", Data: &echo.Map{"data": "Invalid latitude or longitude values"}})
+	// }
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -249,38 +245,30 @@ func GetWhispers(c echo.Context) error {
 			log.Printf("Error decoding whisper: %v", err)
 			continue
 		}
+		nearbyWhispers = append(nearbyWhispers, singleWhisper)
 
-		// --- Skip whispers without a location ---
-		if singleWhisper.Location == "" {
-			log.Printf("Skipping whisper (ID: %s) because it has no location.", singleWhisper.Data) // Assuming Data might exist for logging context
-			continue
-		}
-		// --- End Skip ---
-
-		whisperLocParts := strings.Split(singleWhisper.Location, ",")
+		/* whisperLocParts := strings.Split(singleWhisper.Location, ",")
 		if len(whisperLocParts) != 2 {
-			log.Printf("Skipping whisper (ID: %s) due to invalid location format: %s", singleWhisper.Data, singleWhisper.Location)
+			log.Printf("Skipping whisper %s due to invalid location format: %s", singleWhisper.Data, singleWhisper.Location)
 			continue
-		}
-		whisperLat, errWLat := strconv.ParseFloat(strings.TrimSpace(whisperLocParts[0]), 64)
-		whisperLng, errWLng := strconv.ParseFloat(strings.TrimSpace(whisperLocParts[1]), 64)
-		if errWLat != nil || errWLng != nil {
-			log.Printf("Skipping whisper (ID: %s) due to invalid location values: %s", singleWhisper.Data, singleWhisper.Location)
+		}*/
+		// whisperLat, errWLat := strconv.ParseFloat(strings.TrimSpace(whisperLocParts[0]), 64)
+		// whisperLng, errWLng := strconv.ParseFloat(strings.TrimSpace(whisperLocParts[1]), 64)
+		/* if errWLat != nil || errWLng != nil {
+			log.Printf("Skipping whisper %s due to invalid location values: %s", singleWhisper.Data, singleWhisper.Location)
 			continue
-		}
+		} */
+		/*
+			latDiff := whisperLat - userLat
+			lngDiff := whisperLng - userLng
+			distanceSquared := (latDiff * latDiff) + (lngDiff * lngDiff)
+			distanceFromUser := math.Sqrt(distanceSquared) */
 
-		// --- Distance Calculation (Still flawed, but uses parsed values) ---
-		latDiff := whisperLat - userLat
-		lngDiff := whisperLng - userLng
-		distanceSquared := (latDiff * latDiff) + (lngDiff * lngDiff)
-		distanceFromUser := math.Sqrt(distanceSquared)
-		// --- End Distance Calculation ---
-
-		if distanceFromUser <= radius {
-			if singleWhisper.AmountListens < singleWhisper.MaxListens {
-				nearbyWhispers = append(nearbyWhispers, singleWhisper)
-			}
-		}
+		//if distanceFromUser <= radius {
+		//if singleWhisper.AmountListens < singleWhisper.MaxListens {
+		// nearbyWhispers = append(nearbyWhispers, singleWhisper)
+		//	}
+		//}
 	}
 
 	if err := cursor.Err(); err != nil {

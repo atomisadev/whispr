@@ -55,6 +55,7 @@ const DEFAULT_ZOOM = 10;
 
 const parseLocation = (locationString: string): LatLngLiteral | null => {
   try {
+    console.log(locationString);
     const [latStr, lngStr] = locationString.split(",");
     const lat = parseFloat(latStr);
     const lng = parseFloat(lngStr);
@@ -68,7 +69,7 @@ const parseLocation = (locationString: string): LatLngLiteral | null => {
 }; 
 
 export function GoogleMapComponent() {
-  // const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
+  const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
   const [mapCenter, setMapCenter] = useState<LatLngLiteral>(DEFAULT_CENTER);
   const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
   const [whispers, setWhispers] = useState<Whisper[]>([]);
@@ -135,7 +136,7 @@ export function GoogleMapComponent() {
             console.log(
               `Initial geolocation: Lat: ${latitude}, Lng: ${longitude}`
             );
-            // setUserLocation(currentLocation);
+            setUserLocation(currentLocation);
             setMapZoom(14); // Zoom in closer
           },
           (err) => {
@@ -151,12 +152,12 @@ export function GoogleMapComponent() {
     }, []); // Run only once on mount
 
   // Effect 2: Fetch whispers when user location is known
-  /*
+  
   useEffect(() => {
     if (userLocation) {
       fetchWhispers(userLocation.lat, userLocation.lng);
     }
-  }, [userLocation, fetchWhispers]); // Re-fetch when location changes */
+  }, [userLocation, fetchWhispers]); // Re-fetch when location changes 
 
   // Find the currently selected whisper for the InfoWindow
   const selectedWhisper = whispers.find(
@@ -184,13 +185,13 @@ export function GoogleMapComponent() {
         disableDefaultUI={false} // Show default controls like zoom, fullscreen
         className="absolute top-0 bottom-0 w-full h-full"
       >
-        {/*
+        
         {userLocation && (
           <AdvancedMarker position={userLocation} title={"Your Location"}>
             <span style={{ fontSize: "2rem" }}>📍</span>
           </AdvancedMarker>
         )}
-        */}
+        
 
         {/* Render whisper markers */}
         {whispers.map((whisper) => {

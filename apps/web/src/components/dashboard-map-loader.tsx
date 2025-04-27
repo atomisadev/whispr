@@ -1,14 +1,11 @@
-// apps/web/src/components/dashboard-map-loader.tsx
-"use client"; // <--- Mark this as a Client Component
+"use client";
 
 import React from "react";
 import dynamic from "next/dynamic";
 import { APIProvider } from "@vis.gl/react-google-maps";
 import { Sidepanel } from "./side-panel";
 
-// Define the dynamic import *inside* the client component
 const DynamicMapComponent = dynamic(
-  // Adjust the path if google-map.tsx is elsewhere
   () => import("./google-maps").then((mod) => mod.GoogleMapComponent),
   {
     loading: () => (
@@ -16,12 +13,11 @@ const DynamicMapComponent = dynamic(
         Loading map...
       </div>
     ),
-    ssr: false, // This is now allowed because we are in a Client Component
+    ssr: false,
   }
 );
 
 export default function DashboardMapLoader() {
-  // Read the public env var directly in the client component
   const googleMapsApiKey = process.env.NEXT_PUBLIC_MAPS_API_KEY;
 
   if (!googleMapsApiKey) {
@@ -35,9 +31,9 @@ export default function DashboardMapLoader() {
 
   return (
     <APIProvider apiKey={googleMapsApiKey}>
-        <div className="h-full w-full">
-          <DynamicMapComponent />
-        </div>
+      <div className="h-full w-full">
+        <DynamicMapComponent />
+      </div>
     </APIProvider>
   );
 }

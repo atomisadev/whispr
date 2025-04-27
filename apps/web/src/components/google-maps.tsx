@@ -8,34 +8,26 @@ import React, {
   useRef,
   ChangeEvent,
 } from "react";
-import {
-  Map,
-  AdvancedMarker,
-  APIProvider, // Keep APIProvider here if dashboard-map-loader still uses it
-} from "@vis.gl/react-google-maps";
+import { Map, AdvancedMarker, APIProvider } from "@vis.gl/react-google-maps";
 import Image from "next/image";
 
-// Define the Whisper interface for frontend state
 interface Whisper {
-  _id: string; // Use filename or a generated ID
-  Location: string; // Raw string "lat,lng"
+  _id: string;
+  Location: string;
   DataType: "text" | "image" | "video";
-  Data: string; // Can hold text data or description for media
+  Data: string;
   MaxListens: number;
   AmountListens: number;
   Emotions: string[];
-  MediaUrl?: string; // URL to the media file
-  position?: LatLngLiteral; // Parsed lat/lng
+  MediaUrl?: string;
+  position?: LatLngLiteral;
 }
 
-// Keep the JSON data structure expected from code.json
 interface CodeJsonItem {
   filename: string;
   emotion: string;
   location: string; // "lat,lng"
 }
-
-// Removed WhisperApiResponse as we don't fetch from backend endpoint now
 
 interface LatLngLiteral {
   lat: number;
@@ -44,9 +36,7 @@ interface LatLngLiteral {
 
 const DEFAULT_CENTER: LatLngLiteral = { lat: 40.6945, lng: -74.547 };
 const DEFAULT_ZOOM = 17;
-const INITIAL_LOAD_COUNT = 4; // Load the first 4 videos initially
-
-// Removed LocalStorage Key
+const INITIAL_LOAD_COUNT = 4;
 
 const parseLocation = (locationString: string): LatLngLiteral | null => {
   try {
@@ -78,20 +68,17 @@ const parseLocation = (locationString: string): LatLngLiteral | null => {
   return null;
 };
 
-// Removed LocalStorage functions
-
 export function GoogleMapComponent() {
   const [userLocation, setUserLocation] = useState<LatLngLiteral | null>(null);
   const [mapCenter, setMapCenter] = useState<LatLngLiteral>(DEFAULT_CENTER);
   const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
-  const [whispers, setWhispers] = useState<Whisper[]>([]); // Holds currently displayed whispers
-  const [allCodeData, setAllCodeData] = useState<CodeJsonItem[]>([]); // Holds all data from code.json
-  const [isLoading, setIsLoading] = useState(true); // Start loading initially
+  const [whispers, setWhispers] = useState<Whisper[]>([]);
+  const [allCodeData, setAllCodeData] = useState<CodeJsonItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedWhisper, setSelectedWhisper] = useState<Whisper | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for the file input
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- Helper function to process a CodeJsonItem into a Whisper ---
   const processCodeItemToWhisper = (
     item: CodeJsonItem,
     index?: number
@@ -104,39 +91,35 @@ export function GoogleMapComponent() {
       return null;
     }
 
-    // Expecting .mov based on user feedback and MANDATORY user update of code.json
     const expectedDataType = item.filename.endsWith(".mov")
       ? "video"
       : "unknown";
     if (expectedDataType === "unknown") {
-      // Log warning but still process as video for this simulation
       console.warn(
         `File ${item.filename} does not have expected .mov extension in code.json. Processing as video anyway.`
       );
     }
 
     return {
-      _id: item.filename || `whisper-${index}`, // Use filename as ID
+      _id: item.filename || `whisper-${index}`,
       Location: item.location,
-      DataType: "video", // Hardcode as video
+      DataType: "video",
       Emotions: item.emotion
         .split("/")
         .map((e) => e.trim())
         .filter((e) => e),
-      Data: `Emotion: ${item.emotion}`, // Use Data for description if needed
-      MediaUrl: `/videos/${item.filename}`, // Construct URL (needs .mov in filename)
-      MaxListens: 10, // Default value
-      AmountListens: 0, // Default value
+      Data: `Emotion: ${item.emotion}`,
+      MediaUrl: `/videos/${item.filename}`,
+      MaxListens: 10,
+      AmountListens: 0,
       position: position,
     };
   };
 
-  // --- Effect for Initial Load and Geolocation ---
   useEffect(() => {
     setIsLoading(true);
     setError(null);
 
-    // 1. Get Geolocation
     const getGeoLocation = new Promise<void>((resolve, reject) => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -151,10 +134,9 @@ export function GoogleMapComponent() {
           (err) => {
             console.warn(`Geolocation Error (${err.code}): ${err.message}`);
             setError("Unable to retrieve location. Showing default area.");
-            // Keep default map center/zoom if geolocation fails
             setMapCenter(DEFAULT_CENTER);
             setMapZoom(DEFAULT_ZOOM);
-            resolve(); // Resolve anyway to continue loading data
+            resolve();
           },
           { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
         );
@@ -162,11 +144,10 @@ export function GoogleMapComponent() {
         setError("Geolocation is not supported by this browser.");
         setMapCenter(DEFAULT_CENTER);
         setMapZoom(DEFAULT_ZOOM);
-        resolve(); // Resolve anyway
+        resolve();
       }
     });
 
-    // 2. Fetch and process initial data
     const loadData = async () => {
       try {
         const response = await fetch("/code.json");
@@ -176,13 +157,12 @@ export function GoogleMapComponent() {
           );
         }
         const data: CodeJsonItem[] = await response.json();
-        setAllCodeData(data); // Store all data for later lookups
+        setAllCodeData(data);
 
-        // Process only the first INITIAL_LOAD_COUNT items
         const initialWhispers: Whisper[] = data
           .slice(0, INITIAL_LOAD_COUNT)
           .map(processCodeItemToWhisper)
-          .filter((w): w is Whisper => w !== null); // Filter out nulls from invalid locations
+          .filter((w): w is Whisper => w !== null);
 
         setWhispers(initialWhispers);
         console.log(
@@ -201,32 +181,27 @@ export function GoogleMapComponent() {
       }
     };
 
-    // Run both concurrently and set loading false when both complete
     Promise.all([getGeoLocation, loadData()]).finally(() => {
       setIsLoading(false);
     });
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
 
-  // --- Handler for File Upload ---
   const handleFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
-      return; // No file selected
+      return;
     }
 
     const uploadedFilename = file.name;
     console.log(`File upload attempt: ${uploadedFilename}`);
 
-    // Check if the file is already loaded
     const isAlreadyLoaded = whispers.some((w) => w._id === uploadedFilename);
     if (isAlreadyLoaded) {
       alert(`${uploadedFilename} is already loaded on the map.`);
-      // Reset file input
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
-    // Find the corresponding data in allCodeData
     const matchingCodeItem = allCodeData.find(
       (item) => item.filename === uploadedFilename
     );
@@ -238,13 +213,10 @@ export function GoogleMapComponent() {
       );
       const newWhisper = processCodeItemToWhisper(matchingCodeItem);
       if (newWhisper) {
-        // Add the new whisper to the state
         setWhispers((prevWhispers) => [...prevWhispers, newWhisper]);
         console.log(`Added new whisper for ${uploadedFilename} to map.`);
-        // Optional: Center map on the newly added whisper
         if (newWhisper.position) {
           setMapCenter(newWhisper.position);
-          // setMapZoom(17); // Optionally zoom in more
         }
         alert(`${uploadedFilename} added to the map!`);
       } else {
@@ -260,12 +232,10 @@ export function GoogleMapComponent() {
       );
     }
 
-    // Reset file input so the same file can be selected again if needed
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   if (isLoading) {
-    // Show a simple loading state initially
     return (
       <div className="flex items-center justify-center h-screen text-gray-600">
         Loading Map and Initial Data...
@@ -273,7 +243,6 @@ export function GoogleMapComponent() {
     );
   }
 
-  // Display error if initial loading failed catastrophically
   if (error && whispers.length === 0 && allCodeData.length === 0) {
     return (
       <div className="flex items-center justify-center h-screen text-red-600 p-4 bg-red-50">
@@ -340,21 +309,17 @@ export function GoogleMapComponent() {
           })}
         </Map>
 
-        {/* Non-blocking Error Indicator */}
         {error && (
           <div className="absolute bottom-2 left-2 bg-red-100 text-red-700 bg-opacity-90 p-2 rounded shadow z-10 text-sm">
             Note: {error}
           </div>
         )}
-        {/* Removed Loading Button */}
       </div>
 
-      {/* Sidebar Section */}
       <div className="col-span-1 p-4 overflow-y-auto bg-[#0F2026] text-[#f2f2f2]">
         <h2 className="text-xl font-semibold mb-4">Whisper Details</h2>
         {selectedWhisper ? (
           <div>
-            {/* Video/Image Display */}
             {selectedWhisper.DataType === "video" &&
               selectedWhisper.MediaUrl && (
                 <div className="mb-3">
@@ -382,7 +347,6 @@ export function GoogleMapComponent() {
               </p>
             )}
 
-            {/* Details */}
             <p className="text-sm text-gray-700 mb-1">
               <strong>Emotions:</strong>{" "}
               {selectedWhisper.Emotions.join(", ") || "N/A"}
@@ -398,7 +362,6 @@ export function GoogleMapComponent() {
               ID: {selectedWhisper._id}
             </p>
 
-            {/* Clear Selection */}
             <button
               onClick={() => setSelectedWhisper(null)}
               className="mt-4 px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded text-gray-800 text-sm"
@@ -412,7 +375,6 @@ export function GoogleMapComponent() {
           </p>
         )}
 
-        {/* --- File Upload Section --- */}
         <div className="mt-8 pt-4 border-t border-gray-300">
           <h3 className="text-lg font-semibold mb-2">Add Video Marker</h3>
           <p className="text-xs text-gray-600 mb-2">
@@ -423,9 +385,9 @@ export function GoogleMapComponent() {
             type="file"
             ref={fileInputRef}
             onChange={handleFileUpload}
-            accept="video/quicktime,.mov" // Accept only .mov files
+            accept="video/quicktime,.mov"
             className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#4E4BFF] file:text-[#f2f2f2] hover:file:bg-[#4E4BFFaa] disabled:opacity-50"
-            disabled={allCodeData.length === 0} // Disable if initial data failed to load
+            disabled={allCodeData.length === 0}
           />
           {allCodeData.length === 0 && !isLoading && (
             <p className="text-xs text-red-600 mt-1">
